@@ -1,0 +1,165 @@
+notes 
+
+3/28/2023 - call with melanie and vicki
+1. change colour scheme
+  a. use robbie's blue gradation
+2. get gwas data
+  a. chromosome 22
+  b. parse
+  c. +location 
+  d. add manhattan plot
+3. add top hits table for each pixel
+4. toggle biological layers on left plot
+  a. no layer
+  b. ETDRS
+  c. macula
+5. toggle between ajusted pvalues and logFC on left
+6. show selected pixel
+7. show which side fixed/locked for scrolling
+8. more aggressive filtering for p-value 
+  a. too cluttered and unreadable right now
+  b. tooltips?
+  c. random sampling like robbie
+  d. or take 1/25 as suggested by melanie
+9. scaling
+  a. aws sufficient for traffic?
+  b. what about data usage?
+  c. more efficient summary files?
+10. need to think about interactions for metabolites
+11. write methods in google doc
+
+6/7/2023
+1. count number of lines:
+  a.  cat metabolomics_data_export/metabolites_logFC.csv | wc
+    i. this corresponds to grid points + 1 line header
+    ii. 29042
+2. count columns (https://linuxconfig.org/how-to-count-number-of-columns-in-csv-file-using-bash-shell)
+  a. head -1 metabolomics_data_export/metabolites_logFC.csv  | sed 's/[^,]//g' | wc -c
+  b. 326 - matches metabolomics_data_export/metabolites_info.csv
+3. processing code
+  a. it keeps all genes/metabolites that met a threshold at any of approx (29041/128*256=32768) grid points
+4. python3 -m http.server
+5. html
+  a. implement colorbar
+    i. https://d3-legend.susielu.com/
+  b. fix volcano y-axis - why are there p-val=0? 
+    i. re-sizing 6/7/2023 10:28 PM
+
+6. fpc data
+  a. cat data/fpcs_genomeWide/fpcs_genomeWide.txt | head -5
+  b. head -1 data/fpcs_genomeWide/fpcs_genomeWide.txt   | sed 's/[/s]//g' | wc -c
+    i. 152
+  c. 
+7. subsample file
+  a. awk 'NR % 5 == 0' input > output
+  b. https://unix.stackexchange.com/questions/369181/printing-every-nth-line-out-of-a-large-file-into-a-new-file
+  c. awk 'NR % 100==0' data/fpcs_genomeWide/fpcs_genomeWide.txt > data/fpcs_genomeWide/fpcs_genomeWide_100.txt
+  d. awk 'NR==1' data/fpcs_genomeWide/fpcs_genomeWide.txt > data/fpcs_genomeWide/fpcs_genomeWide_header.txt
+  e. awk 'NR % 100==0' data/chr22/slice63_result.txt > data/chr22/slice63_result_100.txt
+  f. awk 'NR==1' data/chr22/slice63_result.txt > data/chr22/slice63_result_header.txt
+  g. awk 'NR < 4500000'  data/metabolomics_data_export/long/alldata.csv >  data/metabolomics_data_export/long/alldata_half.csv
+8. cat data/chr22/slice63_result.txt   | head -1
+  a. head -1 data/chr22/slice63_result.txt | sed 's/[^,]//g' | wc -c
+  b. 495 - these are positions
+
+6/8/2023 - questions
+1. current interface
+  a. colorbar?
+  b. scale
+  c. filtering + yaxis
+  d. pvalue =0. how?
+2. fpc interface
+  a. fpc data
+  b. what are POS?
+  c. ALT
+  d. A1_FREQ
+  e. BETA_1 to BETA_8
+  f. SE_1 to SE_8
+  g. P_1 to P_8
+3. chromosome data
+  a. what is POS
+  b. what is ID? geneID?
+  c. 
+
+
+6/17/2023
+1. check consistency of snip location and A1 data
+  a.  cat data/chr22/slice62_result.txt | grep rs145460751 6/18/2023 9:47 AM
+
+
+6/19/2023
+1. untar all files 6/19/2023 11:46 AM
+  a. tar -xvzf community_images.tar.gz
+    i. ls | grep -E '.tar.gz' 
+    ii. ls | grep -E '.tar.gz' | parallel -m tar -xvzf {} 
+  b. gzip -d file.gz
+    i. test 1 file
+      1. cd chr1\
+      2. cp slice1_result.txt.gz slice1_result.txt.gz_v0        # just in case
+      3. gzip -d slice1_result.txt.gz 
+      4. rm slice1_result.txt.gz_v0
+    ii. ls | grep -E '.txt.gz' 
+    iii. ls | grep -E '.txt.gz' | parallel echo gzip -d {} 
+    iv. ls | grep -E '.txt.gz' | parallel echo gzip -d {} 
+    v. testing more parallel gzip
+      a. gzip -d chrX/slice1_result.txt.gz 
+      b. find . -name '*.txt.gz' | wc
+      c. find . -name '*.txt.gz' | parallel echo gzip -d {} 
+      d. find . -name '*.txt.gz' | parallel gzip -d {} 
+      e. find . -name '*.txt.gz' | parallel gzip -df {} 
+2. process them in parallel
+  i. parallel echo python3 transform_gwas_to_long.py ::: {1..22}
+  ii. parallel python3 transform_gwas_to_long.py ::: {1..22}
+  iii. python3 transform_gwas_to_long.py 'X'
+3. combine snip_info.json and chr_snip_dict.json (flattened for space)
+
+6/21/2023
+1. check if processes finished as gpu5 crashed
+  a. find . -name 'chr_snip.json'
+2. 
+
+6/29/2023
+1. thickness data from /mactel/regression_results_normal/mean_results_0.csv
+  a. renamed mean_thickness.csv
+  b. added header:
+    i. slice_num,coord_num,mean_thick,std_thick,25_thick,median_thick,75_thick,N
+  c. added heatmap
+2. parallel filter using grep
+  a. grep -A1 -f pattern.txt chr1/slice1_results.txt > out_1_1.txt
+  a. ls | grep -E 'slice*.txt' | parallel  {} 
+
+7/3/2023 - vuejs
+https://www.telerik.com/blogs/creating-and-managing-vue-projects-with-vue-ui
+1. create project
+2. install dependencies
+  # a. "@creativebulma/bulma-tooltip": "^1.2.0",
+  # b. "axios": "^1.3.4",
+  # c. "bulma": "^0.9.4",
+  d. "core-js": "^3.8.3",
+  e. "vue": "^2.6.14",
+  # f. "vue-awesome-countdown": "^1.1.4", (if we ever do live auction, then countdown)
+  # g. "vue-awesome-swiper": "^5.0.1",
+  # h. "vue-axios": "^3.5.2",
+  i. "vue-router": "^3.2.0"
+2. NB vue2.6 needs vue-router3 
+  a. doesn't work with vue-router4, which installs by default from vue cli UI
+  b. error is not explicit enough
+  c. found by trial and error of commenting out code in main.js and router/index.js
+  d. need to install manually with 
+    i. npm install --prefix /mnt/c/Users/yue/Documents/ukb-retomics-master/retinomics vue-router@3.2.0
+  e. see https://docs.npmjs.com/cli/v9/configuring-npm/folders
+  f. see https://docs.npmjs.com/cli/v6/commands/npm-install
+
+7/3/2023
+1. Metabolomics
+  a. as a component
+  b. data load with d3 or axios?
+  c. js load d3 + bootstrap
+  d. make page work
+  e. test
+  f. data sizing and github?
+2. gwas
+  a. might be too big
+  b. 387 GB total (222 GB disk)
+  c. chr1 is 31.9 GB (16.6 disk)
+3.
