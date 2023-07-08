@@ -242,7 +242,7 @@ var freeze_mac = false;
                                             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
   async function get_data() {
-    let fpath = "data/chr" +cur_chr +"/sigSNPs/long/snip_info_" +cur_chr +".csv";
+    let fpath = "data/chr" +cur_chr +"/sigSNPs/snip_info_" +cur_chr +".csv";
     snip_info_data = await d3.csv(fpath, function(d) {
       return { "snip": d.snip, "chr": d.chr, "pos": parseInt(d.pos), "A1":d.A1 };
     });
