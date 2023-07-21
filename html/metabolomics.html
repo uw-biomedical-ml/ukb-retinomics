@@ -10,8 +10,6 @@
 <!-- <script src="sources/jquery-3.6.1.min.js"></script> -->
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <a class="navbar-brand" href="./about.html">Retinomics</a>
-
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
   </button>
@@ -22,25 +20,22 @@
         <a class="nav-link" href="./index.html">Home</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link active" href="./metabolomics.html">Metabolomics</a>
+        <a class="nav-link active" href="./gwas.html">GWAS</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="./gwas.html">GWAS</a>
+        <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">PRS</a>
+        <a class="nav-link disabled" href="./prs.html">PRS</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Immunomics Blood</a>
+        <a class="nav-link disabled" href="./icd10.html">ICD10</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Immunomics Infect</a>
+        <a class="nav-link disabled" href="./hematology.html">Hematology</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Phenomics ICD10</a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link disabled" href="#">Phenomics Charlson</a>
+        <a class="nav-link disabled" href="./infections.html">Infections</a>
       </li>
     </ul>
   </div>
@@ -225,15 +220,25 @@ var bar_thresh = 0.05;
     const req = new XMLHttpRequest();
     req.open("GET", fpath, true);
     req.responseType = "arraybuffer";
+    
+    console.log("get_thickness_data_bin; before load");
 
     req.onload = (event) => {
+      console.log("get_thickness_data_bin; on load");
+
       const arrayBuffer = req.response; // Note: not req.responseText
       if (arrayBuffer) {
+        console.log("get_thickness_data_bin; in arrayBuffer");
+
         //const byteArray = new Uint8Array(arrayBuffer);
         //var data = pako.inflate(byteArray);
         var curData = pako.inflate(arrayBuffer);
+        console.log("get_thickness_data_bin; after deflate: " +curData.length);
+
         //console.log(curData);
         var data_str = new TextDecoder().decode(curData);
+        console.log("get_thickness_data_bin; after decode: " +data_str.length);
+
         //console.log(data_str);
         thickness_data = d3.csvParse(data_str, function(d) {
           return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
