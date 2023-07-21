@@ -224,11 +224,14 @@ TODO - 7/20/2023
 2. test locally and push *5
 3. rename all *.html
 4. GWAS
-  a. all SNPs file -10mm gzip (load once)
+  a. all SNPs file -11mm gzip (load once) 7/21/2023 12:44 PM
     i. traverse all data_raw folders and slice1_result.tx for SNP names and chromosome number
+    ii. NB - not all sigSNPs unique so 150k -> 132k
+    iii. gzip -c html/data/gwas/info_SNPs.csv > html/data/gwas/info_SNPs.csv.gz
+    iv. gzip -c html/data/gwas/info_sigSNPs.csv > html/data/gwas/info_sigSNPs.csv.gz
   b. sigSNPs file - updated in all SNPs file for # significant locations
     i. cross-reference vicki file
-  c. sigSNPs info - (load once)
+  c. sigSNPs info - (load once)  7/21/2023 12:44 PM
   d. look up data for each sigSNP by chromosome and SNP name (safe name) - gzip files for space
   e. aggregate grid location files for all 23 chromosomes and gzip files for space
 
