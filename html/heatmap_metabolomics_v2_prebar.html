@@ -6,7 +6,6 @@
 <link href="sources/bootstrap.min.css" rel="stylesheet" />
 <script src="sources/bootstrap.bundle.min.js"></script>
 <script src="sources/d3.min.js"></script>
-<script src="sources/pako.js"></script>
 <!-- <script src="sources/jquery-3.6.1.min.js"></script> -->
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -19,7 +18,7 @@
   <div class="collapse navbar-collapse" id="navbarNav">
     <ul class="navbar-nav">
       <li class="nav-item">
-        <a class="nav-link" href="./index.html">About</a>
+        <a class="nav-link" href="./about.html">About</a>
       </li>
       <li class="nav-item">
         <a class="nav-link active" href="./heatmap_metabolomics_v2.html">Metabolomics</a>
@@ -80,19 +79,12 @@
     </div>
   </div>  
   <div class="row">
-    <div class="col-4">
+    <div class="col-6">
       <div id="volcano"></div>
     </div>
     
-    <div class="col-6">
+    <div class="col-6">      
       <div id="horizontal_bar"></div>
-    </div>
-    <div class="col-2">
-      <h5>Usage Guide</h5>
-      <ul>
-        <li>Click a heatmap to load volcano and bar plots for grid location (highlighted in green)</li>
-        <li>Click metabolite in volcano or bar plot to load heatmaps for metabolite</li>
-      </ul>
     </div>
   </div>
   
@@ -109,7 +101,6 @@ var margin = {top: 75, right: 70, bottom: 30, left:35},
 console.log(width +";" +height);
 var colorbar_width = margin.left+10+25;
 var heatmap_bar_width =10;
-var bar_width = (width + margin.left + margin.right)*1.8;
 
 var thickness_data;
 var loc_data;
@@ -135,24 +126,7 @@ var cur_ys = 64;
 var cur_met = "Total_C";
 
 var vol_x;
-var max_pval = 1;
-//var MIN_PVALUE = Number.MIN_VALUE;
-var MIN_PVALUE = 1e-10;
-var vol_y = d3.scaleLinear()
-              .range([ height, 0 ])
-              .domain([Math.log10(max_pval), Math.log10(MIN_PVALUE)]);
-              
-/*
-  vol_y = d3.scalePow()
-            .exponent(0.1)
-            .range([ height, 0 ])
-            .domain([max_pval, 0.0])
-            */
-  /* too skewed by Number.MIN_VALUE or cmin
-  vol_y = d3.scaleLog()
-            .range([ height, 0 ])
-            .domain([max_pval, MIN_PVALUE])
-*/
+var vol_y;
 var vol_color;
 var vol_s_min;
 var vol_s_max;
@@ -164,6 +138,8 @@ var bar_tooltip;
 var bar_mousemove;
 var bar_mouseclick;
 var bar_thresh = 0.05;
+//var MIN_PVALUE = Number.MIN_VALUE;
+var MIN_PVALUE = 1e-10;
   
   function init_svg() {
     console.log("in init_svg");
@@ -200,36 +176,10 @@ var bar_thresh = 0.05;
                                             .append("g")
                                             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
-  async function get_data() {
-    //await get_thickness_data();
-    await get_thickness_data_bin();    // using compressed files
-
-    //await get_met_data();
-    await get_met_data_bin(); // using compressed files
-
-    await get_loc_data(); // files already small
-  }
-  async function get_thickness_data_bin() {
-    let fpath = "data/mean_thickness.gz";
-    const req = new XMLHttpRequest();
-    req.open("GET", fpath, true);
-    req.responseType = "arraybuffer";
-
-    req.onload = (event) => {
-      const arrayBuffer = req.response; // Note: not req.responseText
-      if (arrayBuffer) {
-        //const byteArray = new Uint8Array(arrayBuffer);
-        //var data = pako.inflate(byteArray);
-        var curData = pako.inflate(arrayBuffer);
-        //console.log(curData);
-        var data_str = new TextDecoder().decode(curData);
-        //console.log(data_str);
-        thickness_data = d3.csvParse(data_str, function(d) {
-          return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
-        });
-      }
-    };
-    req.send(null);
+  async function get_data() {    
+    await get_thickness_data();
+    await get_met_data();
+    await get_loc_data();
   }
   async function get_thickness_data() {
     let fpath = "data/mean_thickness.csv";
@@ -244,44 +194,29 @@ var bar_thresh = 0.05;
     let fpath = "data/metabolomics_data_export/location_summary/location_summary_" +cur_ys +"_" +cur_xs +".csv";
     loc_data = await d3.csv(fpath, function(d) {
       let temp = parseFloat(d.adjPVal);
+      /*
+      if (temp!=0 && temp < MIN_PVALUE) {  // update lowest if not zero
+        MIN_PVALUE = temp/100;
+      }
+      */
       return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
     });
 
     document.getElementById("loadingData").style.display = "none";
   }
-  async function get_met_data() {
+  async function get_met_data() {    
     document.getElementById("loadingData").style.display = "inherit";
 
     let fpath = "data/metabolomics_data_export/long_v2/" +cur_met +".csv";
     met_data = await d3.csv(fpath, function(d) {
       let temp = parseFloat(d.adjPVal);
+      /*
+      if (temp!=0 && temp < MIN_PVALUE) {  // update lowest if not zero
+        MIN_PVALUE = temp/100;
+      }
+      */
       return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
     });
-
-    document.getElementById("loadingData").style.display = "none";
-  }  
-  async function get_met_data_bin() {
-    document.getElementById("loadingData").style.display = "inherit";
-
-    let fpath = "data/metabolomics_data_export/gzip/" +cur_met +".csv.gz";
-    const req = new XMLHttpRequest();
-    req.open("GET", fpath, true);
-    req.responseType = "arraybuffer";
-
-    req.onload = (event) => {
-      const arrayBuffer = req.response; // Note: not req.responseText
-      if (arrayBuffer) {
-        var curData = pako.inflate(arrayBuffer);
-        //console.log(curData);
-        var data_str = new TextDecoder().decode(curData)
-        //console.log(data_str);
-        met_data = d3.csvParse(data_str, function(d) {
-          let temp = parseFloat(d.adjPVal);
-          return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
-        });
-      }
-    };
-    req.send(null);
 
     document.getElementById("loadingData").style.display = "none";
   }
@@ -355,7 +290,7 @@ var bar_thresh = 0.05;
       }
       sdata =sdata2;
     } else {      
-      color_ticks = d3.ticks(cmin, cmax, NUM_SLICES);
+      color_ticks = d3.ticks(cmin, cmax, NUM_SLICES);      
       yrange = d3.range(1, color_ticks.length+1);
       /*
       y_fieldName = d3.scaleBand()
@@ -425,7 +360,7 @@ var bar_thresh = 0.05;
     let cur_elem = target_svg.selectAll("rect[x='" +mac_xfunc(new_xs) +"'][y='" + mac_yfunc(new_ys) +"']");
     cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
   }
-  function label_metabolites(d) {
+  function label_metabolites(d) {    
     console.log("in label_metabolites: " + d);
     if (d.pvalue<0.05) { 
       return d.metabolite; 
@@ -505,6 +440,18 @@ var bar_thresh = 0.05;
     heatmap_bar_width = mac_xfunc.bandwidth();
     render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, heatmap_bar_width);
     drawETDRS(targetID);
+    /*
+    // create a tooltip
+    var tooltip = d3.select("#heatmap")
+      .append("div")
+      .style("fill-opacity", 0)
+      .attr("class", "tooltip")
+      .style("background-color", "white")
+      .style("border", "solid")
+      .style("border-width", "2px")
+      .style("border-radius", "5px")
+      .style("padding", "5px")
+      */
     
     var mousemove = function(e, d) {
       console.log("in mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
@@ -548,9 +495,8 @@ var bar_thresh = 0.05;
       .style("opacity", function(d) { return 1- d.pvalue} )
       .style("stroke-width", 0)
       .style("stroke", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
-      //.on("mousemove", mousemove)
-      //.on("mousedown", mouseclick)
-      .on("mousedown", mousemove)
+      .on("mousemove", mousemove)
+      .on("mousedown", mouseclick)
 
     highlight_coord(target_svg, cur_xs, cur_ys);
 
@@ -572,13 +518,12 @@ var bar_thresh = 0.05;
     let fieldName = targetID;
 
     target_svg.selectAll("#title")
-              .text(make_macula_msg(met, fieldName));
+              .text(make_macula_msg(met, fieldName));    
 
     // get new snip data
     if (fieldName!="meanThick") { // only highlight new coord if meanThick
       cur_met = met;
-      // await get_met_data();
-      await get_met_data_bin(); // using compressed files
+      await get_met_data();
       let sdata = met_data;
 
       // Build color scale
@@ -610,6 +555,12 @@ var bar_thresh = 0.05;
     var sdata = loc_data;
     cur_xs = xs;
     cur_ys = ys;
+
+    // sanity checks
+    //console.log(d3.max(d3.map(data, d=>{return d.x})));
+    //console.log(d3.max(d3.map(data, d=>{return d.y})));
+    vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
+    vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
 
     volcano_svg.append("text")
               .attr("text-anchor", "end")
@@ -664,20 +615,33 @@ var bar_thresh = 0.05;
          .text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
     // Build Y scales and axis:
-    vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
-    vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
-
     vol_x = d3.scaleLinear()
               .range([ 0, width ])
               .domain([vol_s_min, vol_s_max])
+    
+    let max_pval = 1;
+    /*
+    vol_y = d3.scalePow()
+              .exponent(0.1)
+              .range([ height, 0 ])
+              .domain([max_pval, 0.0])
+              */
+    /* too skewed by Number.MIN_VALUE or cmin
+    vol_y = d3.scaleLog()
+              .range([ height, 0 ])
+              .domain([max_pval, MIN_PVALUE])
+    */
+    vol_y = d3.scaleLinear()
+              .range([ height, 0 ])
+              .domain([Math.log10(max_pval), Math.log10(MIN_PVALUE)])
           
     volcano_svg.append("g")
               .attr("id", "xaxis")
               .attr("transform", "translate(0," + height + ")")
-              .call(d3.axisBottom(vol_x));
+              .call(d3.axisBottom(vol_x));      
     volcano_svg.append("g")
               .attr("id", "yaxis")
-              .call(d3.axisLeft(vol_y));
+              .call(d3.axisLeft(vol_y).ticks());
 
     // Build color scale
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
@@ -685,37 +649,36 @@ var bar_thresh = 0.05;
     console.log("cmin:" +cmin)
     console.log("cmax:" +cmax)
     // 1 color shade and different heatmap colors!
-    var vol_color = d3.scaleSequential()
-                      .interpolator(d3.interpolateBlues)
-                      .domain([cmax, Number.MIN_VALUE]);
+    vol_color = d3.scaleSequential()
+                  .interpolator(d3.interpolateBlues)
+                  .domain([cmax, Number.MIN_VALUE]);
 
     /* // removed text labels as still too messy
     volcano_svg.append('g')
-                .selectAll("dot")
-                .data(sdata)
-                .enter()
-                .append("text")
-                  .attr("class", "scattertext")
-                  .attr("x", function (d) { return vol_x(d.beta) + 5; } )
-                  .attr("y", function (d) { return vol_y(d.pvalue) - 5; } )
-                  .attr("text-anchor", "start")
-              .attr("transform", d => "rotate(-45 " + vol_x(d.beta) + " " + vol_y(d.pvalue) + " ) ")
-              .text(label_metabolites)
+        .selectAll("dot")
+        .data(sdata)
+        .enter()
+        .append("text")
+          .attr("class", "scattertext")
+          .attr("x", function (d) { return vol_x(d.beta) + 5; } )
+          .attr("y", function (d) { return vol_y(d.pvalue) - 5; } )
+          .attr("text-anchor", "start")
+      .attr("transform", d => "rotate(-45 " + vol_x(d.beta) + " " + vol_y(d.pvalue) + " ) ")
+      .text(label_metabolites)
     */
 
     volcano_svg.append('g')
-                .selectAll("dot")
-                .data(sdata)
-                .enter()
-                .append("circle")
-                  .attr("cx", function (d) { return vol_x(d.beta); } )
-                  .attr("cy", function (d) { return vol_y(Math.log10(d.pvalue)); } )
-                  .attr("r", 5)
-                  .style("fill", d=> vol_color(d.pvalue))
-              .on("mouseover", vol_tooltip)
-              //.on("mousemove", vol_mousemove)
-              //.on("mousedown", vol_mouseclick)
-              .on("mousedown", vol_mousemove);
+        .selectAll("dot")
+        .data(sdata)
+        .enter()
+        .append("circle")
+          .attr("cx", function (d) { return vol_x(d.beta); } )
+          .attr("cy", function (d) { return vol_y(Math.log10(d.pvalue)); } )
+          .attr("r", 5)
+          .style("fill", d=> vol_color(d.pvalue))
+      .on("mouseover", vol_tooltip)
+      .on("mousemove", vol_mousemove)
+      .on("mousedown", vol_mouseclick);
     
     // Add title to graph
     volcano_svg.append("text")
@@ -740,27 +703,19 @@ var bar_thresh = 0.05;
     cur_ys=ys;
     var sdata = loc_data;
 
-    vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
-    vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
-    // axis
-    vol_x = d3.scaleLinear()
-              .range([ 0, width ])
-              .domain([vol_s_min, vol_s_max])
-
-    // Build color scale
-    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
-    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
-    console.log("cmin:" +cmin)
-    console.log("cmax:" +cmax)
-    vol_color = d3.scaleSequential()
-                  .interpolator(d3.interpolateBlues)
-                  .domain([cmax, Number.MIN_VALUE]);
     let max_pval= 1;
+    /*
+    vol_y = d3.scalePow()
+              .exponent(0.1)
+              .range([ height, 0 ])
+              .domain([max_pval, 0.0])
+    */    
+    vol_y = d3.scaleLinear()
+              .range([ height, 0 ])
+              .domain([Math.log10(max_pval), Math.log10(MIN_PVALUE)])
 
     volcano_svg.select("g#yaxis")
                .call(d3.axisLeft(vol_y));
-    volcano_svg.select("g#xaxis")
-               .call(d3.axisBottom(vol_x));
     volcano_svg.append("text")
                .attr("text-anchor", "end")
                .attr("transform", "rotate(-90)")
@@ -797,32 +752,16 @@ var bar_thresh = 0.05;
     // append the svg object to the body of the page
     bar_svg = d3.select("#horizontal_bar")
                 .append("svg")
-                .attr("width", bar_width)
+                .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
                 .append("g")
-                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");    
   
     // only significant metabolites and sorted
     let fieldName = "beta";
     //let data_filtered = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < bar_thresh} );
     let data_filtered = d3.filter(loc_data, d => {return d.pvalue < bar_thresh} );
     let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
-    
-    // Add title to graph
-    bar_svg.append("text")
-          .attr("id", "title")
-          .attr("x", 0)
-          .attr("y", -50)
-          .attr("text-anchor", "left")
-          .attr("class", "h5")
-          .text(make_bar_msg(xs, ys));
-
-    /* for horizontal bars
-    bar_svg.append("text")
-            .attr("text-anchor", "end")
-            .attr("x", bar_width +10)
-            .attr("y", height + 25)
-            .text("Effect Size");
 
     // Add X axis - same as volcano
     bar_svg.append("g")
@@ -842,49 +781,27 @@ var bar_thresh = 0.05;
     bar_svg.append("g")
       .classed('y-axis', true)
       .call(d3.axisLeft(y));
-    */
-    // swap axis    
-    bar_svg.append("text")
-            .attr("text-anchor", "end")
-            .attr("x", -22.5)
-            .attr("y", height/2)
-            .text("Effect Size")
-            .attr("transform", "rotate(-90,-22.5," +height/2 +")");
-
-    // Add Y axis - same as volcano X axis
-    let bar_y = d3.scaleLinear()
-                  .range([ 0, height])
-                  .domain([vol_s_max, vol_s_min])
-
-    bar_svg.append("g")
-          .attr("id", "yaxis")
-          .classed('y-axis', true)
-          .call(d3.axisLeft(bar_y))
-          .selectAll("text")
-          .style("text-anchor", "end");
-
-    // X axis
-    var bar_x = d3.scaleBand()
-                  .range([ 0, bar_width])
-                  .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
-              //.padding(.1);
-    
-    bar_svg.append("g")
-          .attr("id", "xaxis")
-          .classed('x-axis', true)
-          .attr("transform", "translate(0," + height + ")")
-          .call(d3.axisBottom(bar_x))
-          .selectAll("text")  
-            .style("text-anchor", "end")
-            .attr("dx", "-.8em")
-            .attr("dy", ".15em")
-            .attr("transform", "rotate(-65)" )
-;
        
     // Build color scale
     const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
     const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
     var mac_color = make_mac_color(fieldName, cmin, cmax);
+
+    // Bars
+    bar_svg.append("text")
+              .attr("text-anchor", "end")
+              .attr("x", width+10)
+              .attr("y", height + 25)
+              .text("Effect Size");
+    
+    // Add title to graph
+    bar_svg.append("text")
+      .attr("id", "title")
+      .attr("x", 0)
+      .attr("y", -50)
+      .attr("text-anchor", "left")
+      .attr("class", "h5")
+      .text(make_bar_msg(xs, ys));
 
     // event handlers
     bar_mousemove = function(e, d) {
@@ -927,49 +844,30 @@ var bar_thresh = 0.05;
     }
 
     bar_svg.selectAll("myRect")
-            .data(data_filtered_sorted)
-            .enter()
-            .append("rect")
-            /* for horizontal bars
-            .attr("y", function(d) { return y(d.metabolite); })
-            .attr("height", y.bandwidth() )
-            .attr("x", function(d) { 
-              if (d[fieldName]>0) {
-                return vol_x(0);
-              } else {
-                return vol_x(d[fieldName]); 
-              }
-            })
-            .attr("width", function(d) { 
-              if (d[fieldName]>0) { 
-                return vol_x(d[fieldName]) - vol_x(0); 
-              } else {
-                return -(vol_x(d[fieldName]) - vol_x(0)); 
-              }
-            })
-            */
-            .attr("x", function(d) { return bar_x(d.metabolite); })
-            .attr("width", bar_x.bandwidth() )
-            .attr("y", function(d) { 
-              if (d[fieldName]>0) {
-                return bar_y(d[fieldName]); 
-              } else {
-                return bar_y(0);
-              }
-            })
-            .attr("height", function(d) { 
-              if (d[fieldName]>0) { 
-                return -(bar_y(d[fieldName]) - bar_y(0)); 
-              } else {
-                return (bar_y(d[fieldName]) - bar_y(0)); 
-              }
-            })
-            .style("fill", function(d) { return mac_color(d[fieldName])} )
-            .style("opacity", function(d) { return 1- d.pvalue} )
-            .on("mouseover", bar_tooltip)
-            //.on("mousemove", bar_mousemove)
-            //.on("mousedown", bar_mouseclick)
-            .on("mousedown", bar_mousemove)
+      .data(data_filtered_sorted)
+      .enter()
+      .append("rect")
+      .attr("y", function(d) { return y(d.metabolite); })
+      .attr("height", y.bandwidth() )
+      .attr("x", function(d) { 
+        if (d[fieldName]>0) {
+          return vol_x(0);
+        } else {
+          return vol_x(d[fieldName]); 
+        }
+      })
+      .attr("width", function(d) { 
+        if (d[fieldName]>0) { 
+          return vol_x(d[fieldName]) - vol_x(0); 
+        } else {
+          return -(vol_x(d[fieldName]) - vol_x(0)); 
+        }
+      })
+      .style("fill", function(d) { return mac_color(d[fieldName])} )
+      .style("opacity", function(d) { return 1- d.pvalue} )
+      .on("mouseover", bar_tooltip)
+      .on("mousemove", bar_mousemove)
+      .on("mousedown", bar_mouseclick)
   }
   async function change_bar(xs, ys) {
     console.log("in change_bar; xs:" +xs, "; ys:" +ys);
@@ -991,7 +889,6 @@ var bar_thresh = 0.05;
     let data_filtered = d3.filter(loc_data, d => {return d.pvalue < bar_thresh} );
     let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
 
-    /* for horizontal bars
     // Y axis
     var y = d3.scaleBand()
               .range([ 0, height ])
@@ -1000,85 +897,45 @@ var bar_thresh = 0.05;
     
     bar_svg.selectAll(".y-axis").remove();
     bar_svg.append("g")
-          .classed('y-axis', true)
-          .call(d3.axisLeft(y));
-    */
-    // Add Y axis - same as volcano X axis
-    let bar_y = d3.scaleLinear()
-                  .range([ 0, height])
-                  .domain([vol_s_max, vol_s_min])
-
-    // X axis
-    var bar_x = d3.scaleBand()
-                  .range([ 0, bar_width])
-                  .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
-    
-    bar_svg.select("g#yaxis")
-               .call(d3.axisLeft(bar_y));    
-    bar_svg.select("g#xaxis")
-            .attr("transform", "translate(0," + height + ")")
-            .call(d3.axisBottom(bar_x))
-            .selectAll("text")  
-              .style("text-anchor", "end")
-              .attr("dx", "-.8em")
-              .attr("dy", ".15em")
-              .attr("transform", "rotate(-65)" )
+      .classed('y-axis', true)
+      .call(d3.axisLeft(y));    
        
     // Build color scale
     const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
     const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
-    var mac_color = make_mac_color(fieldName, cmin, cmax);
+    var mac_color = make_mac_color(fieldName, cmin, cmax);    
     
-    // remove everything and then add - something weird about d3.join() for bar charts!?
+    // remove everything and then add?
     bar_svg.selectAll("rect").remove()
     bar_svg.selectAll("myRect")
-            .data(data_filtered_sorted)
-            .enter()
-            .append("rect")
-            /* for horizontal bars
-            .attr("y", function(d) { return y(d.metabolite); })
-            .attr("height", y.bandwidth() )
-            .attr("x", function(d) { 
-              if (d[fieldName]>0) {
-                return vol_x(0);
-              } else {
-                return vol_x(d[fieldName]); 
-              }
-            })
-            .attr("width", function(d) { 
-              if (d[fieldName]>0) { 
-                return vol_x(d[fieldName]) - vol_x(0); 
-              } else {
-                return -(vol_x(d[fieldName]) - vol_x(0)); 
-              }
-            })
-            */
-            .attr("x", function(d) { return bar_x(d.metabolite); })
-            .attr("width", bar_x.bandwidth() )
-            .attr("y", function(d) { 
-              if (d[fieldName]>0) {
-                return bar_y(d[fieldName]); 
-              } else {
-                return bar_y(0);
-              }
-            })
-            .attr("height", function(d) { 
-              if (d[fieldName]>0) { 
-                return -(bar_y(d[fieldName]) - bar_y(0)); 
-              } else {
-                return (bar_y(d[fieldName]) - bar_y(0)); 
-              }
-            })
-            .style("fill", function(d) { return mac_color(d[fieldName])} )
-            .style("opacity", function(d) { return 1- d.pvalue} )
-            .on("mousemove", bar_tooltip)
-            //.on("mousemove", bar_mousemove)
-            //.on("mousedown", bar_mouseclick)
-            .on("mousedown", bar_mousemove)
+      .data(data_filtered_sorted)
+      .enter()
+      .append("rect")
+      .attr("y", function(d) { return y(d.metabolite); })
+      .attr("height", y.bandwidth() )
+      .attr("x", function(d) { 
+        if (d[fieldName]>0) {
+          return vol_x(0);
+        } else {
+          return vol_x(d[fieldName]); 
+        }
+      })
+      .attr("width", function(d) { 
+        if (d[fieldName]>0) { 
+          return vol_x(d[fieldName]) - vol_x(0); 
+        } else {
+          return -(vol_x(d[fieldName]) - vol_x(0)); 
+        }
+      })
+      .style("fill", function(d) { return mac_color(d[fieldName])} )
+      .style("opacity", function(d) { return 1- d.pvalue} )
+      .on("mousemove", bar_tooltip)
+      .on("mousemove", bar_mousemove)
+      .on("mousedown", bar_mouseclick)
 	}
 
   function make_macula_msg(met, fieldName) {
-    let display_text;
+    let display_text;    
     let msg;
     switch(fieldName) {
       case "beta":
@@ -1111,7 +968,7 @@ var bar_thresh = 0.05;
   function make_bar_msg(xs, ys) {
     cur_xs = xs;
     cur_ys = ys;
-    let msg = "Bar of significant metabolites for grid location: " +xs +", " +ys;
+    let msg = "Bar for grid location: " +xs +", " +ys;
     if (freeze_vol) {
       msg += " (Locked - click a heatmap to unlock)";
     }

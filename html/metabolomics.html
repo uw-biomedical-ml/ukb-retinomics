@@ -19,13 +19,13 @@
   <div class="collapse navbar-collapse" id="navbarNav">
     <ul class="navbar-nav">
       <li class="nav-item">
-        <a class="nav-link" href="./index.html">About</a>
+        <a class="nav-link" href="./index.html">Home</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link active" href="./heatmap_metabolomics_v2.html">Metabolomics</a>
+        <a class="nav-link active" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="./heatmap_gwas.html">GWAS</a>
+        <a class="nav-link" href="./gwas.html">GWAS</a>
       </li>
       <li class="nav-item">
         <a class="nav-link disabled" href="#">PRS</a>
@@ -111,6 +111,7 @@ var colorbar_width = margin.left+10+25;
 var heatmap_bar_width =10;
 var bar_width = (width + margin.left + margin.right)*1.8;
 
+var info_dict = {};
 var thickness_data;
 var loc_data;
 var met_data;
@@ -201,6 +202,8 @@ var bar_thresh = 0.05;
                                             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
   async function get_data() {
+    await get_info_data();
+
     //await get_thickness_data();
     await get_thickness_data_bin();    // using compressed files
 
@@ -208,6 +211,14 @@ var bar_thresh = 0.05;
     await get_met_data_bin(); // using compressed files
 
     await get_loc_data(); // files already small
+  }
+  async function get_info_data() {
+    let fpath = "data/metabolomics_data_export/metabolites_info.csv";
+    var info_data = await d3.csv(fpath, function(d) {
+      let curDict = { "bmarker":d.Biomarker, "desc":d.Description, "group":d.Group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC }
+      info_dict[d.Biomarker] = curDict;
+      return curDict;
+    });
   }
   async function get_thickness_data_bin() {
     let fpath = "data/mean_thickness.gz";
@@ -661,7 +672,9 @@ var bar_thresh = 0.05;
          //.style("top", (d3.mouse(this)[1] +10) +"px")
          .style("left", (e.pageX +10) +"px")
          .style("top", (e.pageY +10) +"px")
-         .text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .style("color", "lime")
+         //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .text(info_dict[d.metabolite]["desc"] +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
     // Build Y scales and axis:
     vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
@@ -922,8 +935,10 @@ var bar_thresh = 0.05;
          //.style("left", (d3.mouse(this)[0] +10) +"px")
          //.style("top", (d3.mouse(this)[1] +10) +"px")
          .style("left", (e.pageX +10) +"px")
-         .style("top", (e.pageY +10) +"px")
-         .text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .style("top", (e.pageY +10) +"px")         
+         .style("color", "lime")
+         //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .text(info_dict[d.metabolite]["desc"] +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
 
     bar_svg.selectAll("myRect")

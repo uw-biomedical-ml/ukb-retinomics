@@ -162,4 +162,80 @@ https://www.telerik.com/blogs/creating-and-managing-vue-projects-with-vue-ui
   a. might be too big
   b. 387 GB total (222 GB disk)
   c. chr1 is 31.9 GB (16.6 disk)
-3.
+
+
+7/7/2023
+1. setup git
+echo "# ukb-retinomics" >> README.md
+git init
+git add README.md
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/uw-biomedical-ml/ukb-retinomics.git
+git remote -v
+git push -u origin main
+2. install netlify for git
+3. push git
+4. buy sitename
+5. attempt first push and site
+6. add metabolimics
+7. add all metabolimics
+8. add gwas
+9. add gwas data
+10. add tabs and main page
+11. email co-authors
+12. what if we dont fit?
+
+7/10/2023
+1. no text for volcano
+2. horizontal labelling of metabolites?
+3. gzip text and ungzip and read in html for speed and github
+4. sentinel SNPs only for site
+5. check github repo size
+
+7/12/2023
+1. gzip individual files for compression - only do this for heatmap files?! at least for metabolomics
+  a. gzip -c metabolomics_data_export/long_v2/Acetate.csv > metabolomics_data_export/long_v2/Acetate.gz
+  b. find metabolomics_data_export/long_v2/ -type f -name '*.csv' 
+  c. find metabolomics_data_export/long_v2/ -type f -name '*.csv' | parallel echo gzip -c {} > {}
+  d. ls | grep -E '.csv' | parallel echo gzip -c {} > {}
+  e. gzip -r metabolomics_data_export/long_v2/*.csv (recursive - consumes original file)
+2. mean thickness
+  a. cd /data/yue/ukb-retomics-master/data
+  b. gzip -c mean_thickness.csv > mean_thickness.gz
+
+7/17/2023
+1. python3 -m http.server
+
+7/20/2023
+1. decompression
+  a. sending and receiving binary data - https://developer.mozilla.org/en-US/docs/Web/API/XMLHttpRequest/Sending_and_Receiving_Binary_Data
+  b. https://stackoverflow.com/questions/14620769/decompress-gzip-and-zlib-string-in-javascript - String.fromCharCode.apply(null, new Uint16Array(data));
+  c. pako docs - https://nodeca.github.io/pako/ - NB pako already inflates to Uint8Array
+  d. data is a mixture of Float64Array and string
+  e. https://stackoverflow.com/questions/69179292/i-want-to-decompress-a-gzip-string-with-javascript - easier with new TextDecoder().decode()
+  f. parse with d3.csv.parse
+
+TODO - 7/20/2023
+1. new pages *5
+  a. update file folders
+  b. make gzip
+  c. save raw files (cp)
+2. test locally and push *5
+3. rename all *.html
+4. GWAS
+  a. all SNPs file -10mm gzip (load once)
+    i. traverse all data_raw folders and slice1_result.tx for SNP names and chromosome number
+  b. sigSNPs file - updated in all SNPs file for # significant locations
+    i. cross-reference vicki file
+  c. sigSNPs info - (load once)
+  d. look up data for each sigSNP by chromosome and SNP name (safe name) - gzip files for space
+  e. aggregate grid location files for all 23 chromosomes and gzip files for space
+
+7/21/2023
+1. remove some old files from git
+  a. git rm -r html\data\chr22\*.txt
+  b. git rm -r html\data\chr22\sigSNPs\long
+  c. git commit -m "removing old uncompressed files"
+  d. git push -u origin main
+2. 

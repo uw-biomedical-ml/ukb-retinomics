@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+
+<link href="sources/bootstrap.min.css" rel="stylesheet" />
+<script src="sources/bootstrap.bundle.min.js"></script>
+<script src="sources/d3.min.js"></script>
+
+<div class="row  align-items-center">
+  <div class="col-8">
+    <img src="./imgs/Retinomics_logo.png" alt="Retinomics" style="width:100%">
+  </div>
+  <div class="col-2">
+    <img src="./imgs/45-451959_logo-university-of-washington-logo-transparent.png" alt="University of Washington" style="width:100%">
+  </div>
+  <div class="col-2">    
+    <img src="./imgs/Wehi-logo-2020.png" alt="WEHI" style="width:100%">
+  </div>
+</div>
+
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+    <span class="navbar-toggler-icon"></span>
+  </button>
+
+  <div class="collapse navbar-collapse" id="navbarNav">
+    <ul class="navbar-nav">
+      <li class="nav-item">
+        <a class="nav-link active" href="./index.html">Home</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="./gwas.html">GWAS</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="./prs.html">PRS</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="./icd10.html">ICD10</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="./hematology.html">Hematology</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="./infections.html">Infections</a>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+  <div class="row"> 
+    <img src="./imgs/Banner.png" alt="Retinal Thickness" style="width:100%">
+  </div>
+
+  <style>
+    .list-group {
+      list-style: decimal inside;
+    }
+    .list-group-item {
+      display: list-item;
+    }
+  </style>
+
+</head>
+
+<body class="container">
+<div class="row">
+  <h4>About</h4>
+  <p>The retinomics portal is a web interface to explore the effect that different biological factors have on the morphology of the retina.</p>
+  <p>A variety of <i>omics</i> are included in this project including genomics, metabolomics, phenomics, other traits.</p>
+  <p>The currents version is 1.0.0</p>
+</div>
+
+<div class="row align-items-center">
+  <div class="col-9">
+    <img src="./imgs/Retinal_Thickness_Infographic.png" alt="Infographic" style="width:100%">
+  </div>
+  <div class="col-3">
+    <p>To learn how these results were obtained please refer to the publication: 
+      <span style="color:blue;">Jackson VE, Wu Y, Bonelli R et al, 
+        <i>
+          Spatial high-resolution multi-omics effects on AI-derived human retinal thickness reveals retinal susceptibility to systemic diseases and insults
+        </i>
+      </span>
+    </p>
+  </div>
+</div>
+
+<div class="row">
+  <h4>How to use:</h4>
+  <ol class="list-group">
+    <li class="list-group-item">Select the omics you want to explore from either the top navigation bar or the icons below</li>
+    <li class="list-group-item">In each tab, you will find a search bar, enter the marker you would like to see (e.g. rs715, Glycine, AMD, Hypertension, 
+Neutrophil count)</li>
+    <li class="list-group-item">You will see the effect size on retinal thickness (minor allele counts, metabolic abundance, disease presence, PRS score etc..) for each 
+biomarker as well as the association p-value for every single area of the retina </li>
+    <!-- <li>If you want browse results by retinal area, go to the Reactive tab, select the omic you want to see and click on any area of the retina. A 
+plot comparing all markers of the selected omics will appear. </li> -->
+  </ol>
+</div>
+<br>
+
+<div class="row">
+  <h4>Start Exploring:</h4>
+  <div class="col-4">
+    <a class="nav-link" href="./gwas.html">
+      <h4 class="text-center">GWAS</h4>
+      <img src="./imgs/GWAS.png" alt="GWAS" style="width:100%">
+    </a>
+  </div>
+  <div class="col-4">
+    <a class="nav-link" href="./metabolomics.html">
+      <h4 class="text-center">Metabolomics</h4>
+      <img src="./imgs/metabolomics.png" alt="Metabolomics" style="width:100%">
+    </a>
+  </div>
+  <div class="col-4">
+    <a class="nav-link" href="./icd10.html">
+      <h4 class="text-center">ICD10 Codes</h4>
+      <img src="./imgs/icd10.png" alt="ICD10" style="width:100%">
+    </a>
+  </div>
+  <div class="col-4">
+    <a class="nav-link" href="./infections.html">
+      <h4 class="text-center">Infections</h4>
+      <img src="./imgs/infections.png" alt="Infections" style="width:100%">
+    </a>
+  </div>
+  <div class="col-4">
+    <a class="nav-link" href="./hematology.html">
+      <h4 class="text-center">Hematology</h4>
+      <img src="./imgs/hematology.png" alt="Hematology" style="width:100%">
+    </a>
+  </div>
+  <div class="col-4">
+    <a class="nav-link" href="./prs.html">
+      <h4 class="text-center">Polygenic Risk Scores</h4>
+      <img src="./imgs/polygenicRisk.png" alt="Polygenic Risk" style="width:100%">
+    </a>
+  </div>
+</div>
+
+</body>
+</html>
