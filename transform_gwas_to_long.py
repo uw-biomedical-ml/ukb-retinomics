@@ -420,5 +420,6 @@ if __name__ == "__main__":
     chromomsomes = [chr_num]
     # process_chromosome(chromomsomes)
     process_chromosome_memory(chromomsomes)
+    #process_chromosome_memory(CHROMOSOMES[:-1])
     # convert_to_flat_csv(chr_num)
     # summary_by_location()

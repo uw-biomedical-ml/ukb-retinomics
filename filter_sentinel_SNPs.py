@@ -156,7 +156,7 @@ def make_combined_SNPs_info_file():
     sigSNPS_outfile = os.path.join(data_folder_html, "info_sigSNPs.csv")
     SNPS_outfile = os.path.join(data_folder_html, "info_SNPs.csv")
     with open(sigSNPS_outfile, "w") as fout_sig:
-        fout_sig.write("SNP,chr,pos,A1,num_sig,bonf\n")
+        fout_sig.write("SNP,chr,pos,A1,num_sig,bonf,sentinel\n")
         with open(SNPS_outfile, "w") as fout:
             # fout.write("SNP,chr,pos,A1\n")
             fout.write("SNP,chr\n")    # bare minimum
@@ -178,7 +178,9 @@ def make_combined_SNPs_info_file():
                             curID = cur_dict["ID"]
                             if curID in locSNPIDs_set:
                                 sentinel_data = sentinelDict[sigSNPs_dict[curID]["sentinelSNPID"]]
-                                out_vals = [curID, chromosome, cur_dict["POS"], cur_dict["A1"], sentinel_data["nPixelsLocus"], sentinel_data["BonferroniSig"]]
+                                is_sentinel = int(curID in sentinelDict)
+                                out_vals = [curID, chromosome, cur_dict["POS"], cur_dict["A1"],
+                                            sentinel_data["nPixelsLocus"], sentinel_data["BonferroniSig"], is_sentinel]
                                 fout_sig.write("{}\n".format(",".join([str(x) for x in out_vals])))
                             else:
                                 out_vals = [curID, chromosome]  # bare minimum
@@ -244,5 +246,5 @@ if __name__ == "__main__":
     # parse_sentinelSNPs()
     # parse_lociSNPs()
     # filter_SNPs()
-    # make_combined_SNPs_info_file()
-    make_combined_location_files()
+    make_combined_SNPs_info_file()
+    # make_combined_location_files()

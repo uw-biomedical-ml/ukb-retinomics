@@ -12,9 +12,13 @@ numerical_acc = False
 alldata = {}
 allstumps = []
 f = "metabolomics_data_export"
-folders = ["metabolomics_data_export", "PRS_data_export", "immunomics_data_export/blood", "immunomics_data_export/infect", "Phenomics_data_export/charlson", "Phenomics_data_export/icd10"]
+# folders = ["metabolomics_data_export", "PRS_data_export", "immunomics_data_export/blood", "immunomics_data_export/infect", "Phenomics_data_export/charlson", "Phenomics_data_export/icd10"]
+folders = ["metabolomics_data_export"]
+#data_folder = os.path.join("html", "data")
+data_folder = os.path.join("data_raw")
 
-for f in folders:
+for f_short in folders:
+    f = os.path.join(data_folder, f_short)
     for fn in sorted(glob.glob("{}/*.csv".format(f))):
         if "_info.csv" in fn:
             continue
@@ -44,7 +48,8 @@ for f in folders:
                     key = "###".join((x,y,header[i]))
                     if not key in alldata:
                         alldata[key] = []
-                    alldata[key].append(str(round(float(arr[i]), 3)))
+                    #alldata[key].append(str(round(float(arr[i]), 3)))
+                    alldata[key].append( str( float(arr[i]) ) )
 
     print(allstumps)
     tokeep = set()
@@ -61,6 +66,7 @@ for f in folders:
     outdir = os.path.join(f, "long")
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
+        
     # fname = "alldata_v1.csv" if numerical_acc else "alldata.csv"
     # with open(os.path.join(outdir, fname), "w") as fout:
     #     fout.write("metabolite,x,y,%s\n" % ",".join(allstumps))
