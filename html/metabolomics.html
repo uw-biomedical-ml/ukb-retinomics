@@ -16,14 +16,17 @@
 
   <div class="collapse navbar-collapse" id="navbarNav">
     <ul class="navbar-nav">
+      <a class="navbar-brand" href="./index.html">
+        <img src="./imgs/Retinomics_logo_small.png" alt="Retinomics" width="50" height="50">
+      </a>
       <li class="nav-item">
         <a class="nav-link" href="./index.html">Home</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link active" href="./gwas.html">GWAS</a>
+        <a class="nav-link" href="./gwas.html">GWAS</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
+        <a class="nav-link active" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
         <a class="nav-link disabled" href="./prs.html">PRS</a>
@@ -45,11 +48,33 @@
 
 <body>
 
-<div class="container-fluid"> <!-- max-width:1320 from bootstrap -->
-  <button class="btn btn-primary" id="loadingData">
-    <span class="spinner-border spinner-border-sm"></span>
-    Loading..
-  </button>
+<div class="container-fluid" id="bodyContainer" style="background-color:#CCC"> <!-- max-width:1320 from bootstrap -->
+  
+  <div class="row" style="width:50%">
+    <button class="btn btn-primary col-2" id="loadingData">
+      <span class="spinner-border spinner-border-sm"></span>
+      Loading..
+    </button>
+
+    <div class="form-group col-10">
+      <!--<label for="myInput" class="col-sm-2 col-form-label">Search for metabolites</label>
+      <div class="col-sm-10">-->
+        <input type="text" class="form-control" id="myInput" onkeyup="filterBiomarkers()" placeholder="Search for metabolites">
+      <!--</div>-->
+    </div>
+
+    <table id="myTable" class="table-striped" style="display:none";>
+      <thead>
+        <tr class="header thead-dark">
+          <th style="width:15%;">Metabolite</th>
+          <th style="width:60%;">Desc</th>
+          <th style="width:25%;">% Significant Macula Points</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
 
   <div class="row">
     <div class="col-4">
@@ -85,8 +110,9 @@
     <div class="col-2">
       <h5>Usage Guide</h5>
       <ul>
-        <li>Click a heatmap to load volcano and bar plots for grid location (highlighted in green)</li>
-        <li>Click metabolite in volcano or bar plot to load heatmaps for metabolite</li>
+        <li>Click a heatmap to load volcano and bar plots for selected macula location (highlighted in green)</li>
+        <li>Click a metabolite in volcano or bar plot to load its heatmaps</li>
+        <li>Search for metabolites directly, select them and see their heatmaps</li>
       </ul>
     </div>
   </div>
@@ -95,6 +121,8 @@
 </div>
 
 <script>
+var updateStatus = false;
+
 var COLOR_LIME = "rgb(50, 205, 50)";
 //var max_size = Math.min(document.body.clientWidth, 1600)/2;
 var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
@@ -107,6 +135,7 @@ var heatmap_bar_width =10;
 var bar_width = (width + margin.left + margin.right)*1.8;
 
 var info_dict = {};
+var info_array = [];
 var thickness_data;
 var loc_data;
 var met_data;
@@ -133,12 +162,12 @@ var cur_met = "Total_C";
 var vol_x;
 var max_pval = 1;
 //var MIN_PVALUE = Number.MIN_VALUE;
-var MIN_PVALUE = 1e-10;
+var MIN_PVALUE = 1e-10;              
+var vol_y;  // now updated in render_volcano and change_volcano
+/*
 var vol_y = d3.scaleLinear()
               .range([ height, 0 ])
-              .domain([Math.log10(max_pval), Math.log10(MIN_PVALUE)]);
-              
-/*
+              .domain([-Math.log10(max_pval), -Math.log10(MIN_PVALUE)]);
   vol_y = d3.scalePow()
             .exponent(0.1)
             .range([ height, 0 ])
@@ -197,28 +226,79 @@ var bar_thresh = 0.05;
                                             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
   async function get_data() {
-    await get_info_data();
+    var myPromises = [];
 
-    //await get_thickness_data();
-    await get_thickness_data_bin();    // using compressed files
+    let thickness_promise = get_thickness_data_bin(); // using compressed files
+    myPromises.push(thickness_promise);
 
-    //await get_met_data();
-    await get_met_data_bin(); // using compressed files
+    let met_promise = get_met_data_bin(); // using compressed files
+    myPromises.push(met_promise);
 
-    await get_loc_data(); // files already small
+    // let loc_promise = get_loc_data();   // files already small
+    let loc_promise = get_loc_data_bin();  // using compressed files - even smaller
+    myPromises.push(loc_promise);       // needed it for 1st display
+
+    get_info_data();  // can load in background
+    return myPromises;
   }
   async function get_info_data() {
+    console.log("get_info_data; before d3.csv");
+
     let fpath = "data/metabolomics_data_export/metabolites_info.csv";
-    var info_data = await d3.csv(fpath, function(d) {
+    info_array = await d3.csv(fpath, function(d) {
+      console.log("get_info_data; in d3.csv");
+
       let curDict = { "bmarker":d.Biomarker, "desc":d.Description, "group":d.Group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC }
       info_dict[d.Biomarker] = curDict;
+      //info_array.push(curDict);
       return curDict;
     });
   }
   async function get_thickness_data_bin() {
     let fpath = "data/mean_thickness.gz";
+
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true; // default async
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer";
+      
+      console.log("get_thickness_data_bin; before load");
+      req.onload = (event) => {
+        console.log("get_thickness_data_bin; on load");
+        
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_thickness_data_bin; in arrayBuffer");
+
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_thickness_data_bin; after deflate: " +curData.length);
+
+          //console.log(curData);
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_thickness_data_bin; after decode: " +data_str.length);
+
+          //console.log(data_str);
+          thickness_data = d3.csvParse(data_str, function(d) {
+            return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
+          });
+          resolve(thickness_data);
+        } else {
+          console.log("File not found: " +fpath);
+          resolve(null);
+        }
+      };
+      
+      req.send(null);
+    });
+    return myPromise;
+  }
+  /*
+  async function get_thickness_data_bin() {
+    let fpath = "data/mean_thickness.gz";
     const req = new XMLHttpRequest();
-    req.open("GET", fpath, true);
+    let asyncFlag = true;
+    req.open("GET", fpath, asyncFlag);
     req.responseType = "arraybuffer";
     
     console.log("get_thickness_data_bin; before load");
@@ -232,6 +312,7 @@ var bar_thresh = 0.05;
 
         //const byteArray = new Uint8Array(arrayBuffer);
         //var data = pako.inflate(byteArray);
+        // another alternative - https://developer.mozilla.org/en-US/docs/Web/API/DecompressionStream/DecompressionStream
         var curData = pako.inflate(arrayBuffer);
         console.log("get_thickness_data_bin; after deflate: " +curData.length);
 
@@ -245,61 +326,182 @@ var bar_thresh = 0.05;
         });
       }
     };
-    req.send(null);
+    
+    req.onerror = (event) => {
+      console.log("error: " +event);
+    }
+
+    req.onreadystatechange = () => {
+      console.log("in onreadystatechange");
+
+      // In local files, status is 0 upon success in Mozilla Firefox
+      if (req.readyState === XMLHttpRequest.DONE) {
+        const status = req.status;
+        if (status === 0 || (status >= 200 && status < 400)) {
+          //console.log(req.responseText);  // for text response NOT arraybuffer
+          console.log("success state");  // The request has been completed successfully
+        } else {
+          console.log("error state");  // Oh no! There has been an error with the request!
+        }
+      }
+    };
+
+    console.log("get_thickness_data_bin; before send");
+    req.send(null);    
+    console.log("get_thickness_data_bin; after send");
   }
+  */
   async function get_thickness_data() {
-    let fpath = "data/mean_thickness.csv";
+    //let fpath = "data/mean_thickness.gz"; // direct call doesn't work - need to check header and enable decompress
+    let fpath = "data/mean_thickness.csv";    
     thickness_data = await d3.csv(fpath, function(d) {
       return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
     });
   }
+  function loading_ui() {
+    if (!updateStatus) {  // first load
+      document.getElementById("loadingData").style.display = "inherit";
+    } else {
+      document.getElementById("loadingData").style.display = "inherit";
+      // document.getElementById("bodyContainer").classList.add("spinner-grow", "m5");
+      document.getElementById("bodyContainer").classList.add("bg-secondary");
+    }
+  }
+  function loaded_ui() {
+    if (!updateStatus) {
+      document.getElementById("loadingData").style.display = "none";
+    } else {
+      document.getElementById("loadingData").style.display = "none";
+      // document.getElementById("bodyContainer").classList.remove("spinner-grow", "m5");
+      document.getElementById("bodyContainer").classList.remove("bg-secondary");
+    }
+  }
   async function get_loc_data() {
-    document.getElementById("loadingData").style.display = "inherit";
-
     // NB python code swapped x,y; x should range 1-256, and y from 1-128
     let fpath = "data/metabolomics_data_export/location_summary/location_summary_" +cur_ys +"_" +cur_xs +".csv";
+    /*
     loc_data = await d3.csv(fpath, function(d) {
       let temp = parseFloat(d.adjPVal);
       return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
     });
+    */
+    
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true;
+      req.open("GET", fpath, asyncFlag);
+      //req.responseType = "arraybuffer"; // actually text
+      
+      console.log("get_loc_data; before load");
+      req.onload = (event) => {
+        console.log("get_loc_data; on load");
+        
+        if (req.status==200) {
+          const data_str = req.response; // Note: not req.responseText
+          console.log("get_loc_data; data_str: " +data_str.length);
 
-    document.getElementById("loadingData").style.display = "none";
+          loc_data = d3.csvParse(data_str, function(d) {
+            let temp = parseFloat(d.adjPVal);
+            //return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
+            return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp};
+          });
+          resolve(loc_data);
+        } else {
+          console.log("File not found: " + fpath);
+          resolve(null);
+        }
+      };
+      req.send(null);
+    });
+    
+    return myPromise;
+  }
+  async function get_loc_data_bin() {
+    // NB python code swapped x,y; x should range 1-256, and y from 1-128
+    let fpath = "data/metabolomics_data_export/location_summary/location_summary_" +cur_ys +"_" +cur_xs +".csv.gz";
+    
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true;
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer"; 
+      
+      console.log("get_loc_data; before load");
+      req.onload = (event) => {
+        console.log("get_loc_data; on load");
+        
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_loc_data_bin; in arrayBuffer");
+
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_loc_data_bin; after deflate: " +curData.length);
+
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_loc_data_bin; after decode: " +data_str.length);
+          
+          loc_data = d3.csvParse(data_str, function(d) {
+            let temp = parseFloat(d.adjPVal);
+            //return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
+            return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp};
+          });
+          resolve(loc_data);
+        } else {
+          console.log("File not found: " + fpath);
+          resolve(null);
+        }
+      };
+      req.send(null);
+    });
+    
+    return myPromise;
   }
   async function get_met_data() {
-    document.getElementById("loadingData").style.display = "inherit";
-
     let fpath = "data/metabolomics_data_export/long_v2/" +cur_met +".csv";
     met_data = await d3.csv(fpath, function(d) {
       let temp = parseFloat(d.adjPVal);
-      return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
+      //return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
+      return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
     });
-
-    document.getElementById("loadingData").style.display = "none";
   }  
   async function get_met_data_bin() {
-    document.getElementById("loadingData").style.display = "inherit";
-
     let fpath = "data/metabolomics_data_export/gzip/" +cur_met +".csv.gz";
-    const req = new XMLHttpRequest();
-    req.open("GET", fpath, true);
-    req.responseType = "arraybuffer";
+    
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true;
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer";
 
-    req.onload = (event) => {
-      const arrayBuffer = req.response; // Note: not req.responseText
-      if (arrayBuffer) {
-        var curData = pako.inflate(arrayBuffer);
-        //console.log(curData);
-        var data_str = new TextDecoder().decode(curData)
-        //console.log(data_str);
-        met_data = d3.csvParse(data_str, function(d) {
-          let temp = parseFloat(d.adjPVal);
-          return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
-        });
-      }
-    };
-    req.send(null);
+      console.log("get_met_data_bin; before load");
+      req.onload = (event) => {
+        console.log("get_met_data_bin; on load");
 
-    document.getElementById("loadingData").style.display = "none";
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_met_data_bin; in arrayBuffer");
+        
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_met_data_bin; after deflate: " +curData.length);
+
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_met_data_bin; after decode: " +data_str.length);
+
+          met_data = d3.csvParse(data_str, function(d) {
+            let temp = parseFloat(d.adjPVal);
+            //return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
+            return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
+          });
+          resolve(met_data);
+        } else {
+          console.log("File not found: " +fpath);
+          resolve(null);
+        }
+      };
+      req.send(null);
+    });
+
+    return myPromise;
   }
 
   async function render() {
@@ -309,6 +511,7 @@ var bar_thresh = 0.05;
 
     //Read the data
     console.log("before data load");
+    /*
     await get_data();
     //let fpath = "data/metabolomics_data_export/long/alldata.csv";
     console.log("after data load");
@@ -318,6 +521,20 @@ var bar_thresh = 0.05;
     render_mac(null, "meanThick");
     render_volcano(cur_xs, cur_ys);
     render_bar(cur_xs, cur_ys);
+    */
+    
+    loading_ui();
+    let myPromises = await get_data();
+    Promise.all(myPromises).then(fileContents => {
+      render_mac("Total_C", "beta");
+      render_mac("Total_C", "pvalue");
+      render_mac(null, "meanThick");
+      render_volcano(cur_xs, cur_ys);
+      render_bar(cur_xs, cur_ys);
+  
+      console.log("after data load");
+      loaded_ui();
+    });
   }
   
   async function render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, bandwidth) {
@@ -347,13 +564,13 @@ var bar_thresh = 0.05;
                       .attr("text-anchor", "end")
                       .attr("x", fieldName=="meanThick" ? 15:10)
                       .attr("y", 0)
-                      .text(d3.format(num_format)(cmax_transformed)+suffix)
+                      .text(d3.format(num_format) (fieldName=="pvalue" ? cmin_transformed:cmax_transformed)+suffix);
 
     target_colorbar_svg.append("text")
                       .attr("text-anchor", "end")
                       .attr("x", fieldName=="meanThick" ? 15:10)
                       .attr("y", height + 10)
-                      .text(d3.format(num_format)(cmin_transformed)+suffix);
+                      .text(d3.format(num_format) (fieldName=="pvalue" ? cmax_transformed:cmin_transformed)+suffix);
       
     // Build colorbar Y scale
     //var csv_y_fieldName = d3.map(sdata, function(d){return d[fieldName]; });  // map field values
@@ -362,7 +579,8 @@ var bar_thresh = 0.05;
     var sdata2 = [];
     var yrange;
     if (fieldName=="pvalue") {
-      color_ticks = d3.ticks(Math.log10(cmin), Math.log10(cmax), NUM_SLICES);
+      // color_ticks = d3.ticks(Math.log10(cmin), Math.log10(cmax), NUM_SLICES);  // color in other direction
+      color_ticks = d3.ticks(Math.log10(cmax), Math.log10(cmin), NUM_SLICES);
       yrange = d3.range(1, color_ticks.length+1);
       for (let subdx=0; subdx < color_ticks.length; subdx++) {
         let temp = {"y":yrange[subdx]};
@@ -405,7 +623,7 @@ var bar_thresh = 0.05;
   }
   function extract_macula_heatmap_data(d, mac_color, fieldName) {
     if (fieldName=='pvalue') {
-      return mac_color(Math.log10(d[fieldName]));
+      return mac_color(-Math.log10(d[fieldName]));
     } else {
       return mac_color(d[fieldName]);
     }
@@ -420,10 +638,11 @@ var bar_thresh = 0.05;
       mac_color = d3.scaleSequential()
                     //.interpolator(d3.interpolateGreys)
                     .interpolator(d3.interpolateCividis)
-                    .domain([Math.log10(cmax), Math.log10(cmin)]);
+                    .domain([-Math.log10(cmax), -Math.log10(cmin)]);
     } else if (fieldName=="meanThick") {
       mac_color = d3.scaleSequential()
-                    .interpolator(d3.interpolateBlues)
+                    //.interpolator(d3.interpolateBlues)
+                    .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
     } else {
       mac_color = d3.scaleSequential()
@@ -461,7 +680,7 @@ var bar_thresh = 0.05;
                 //.attr("r", mac_xfunc2(NUM_COORDS/2))
                 .attr("r", mac_yfunc2(radii[rdx]))
                 .style("stroke","black")
-                .style("stroke-width", 1)
+                .style("stroke-width", 2)
                 .style("opacity", 1)
                 .style("fill-opacity",0)
     }
@@ -583,7 +802,6 @@ var bar_thresh = 0.05;
 
   async function change_macula(met, targetID) {
     console.log("in change_macula; met:" +met, "; targetID:" +targetID);
-
     const target_svg = heatmap_svgs[targetID];
     let fieldName = targetID;
 
@@ -594,7 +812,10 @@ var bar_thresh = 0.05;
     if (fieldName!="meanThick") { // only highlight new coord if meanThick
       cur_met = met;
       // await get_met_data();
-      await get_met_data_bin(); // using compressed files
+      updateStatus = true;
+      loading_ui();
+      await get_met_data_bin(); // using compressed files      
+      loaded_ui();
       let sdata = met_data;
 
       // Build color scale
@@ -621,7 +842,8 @@ var bar_thresh = 0.05;
 
     // when rendering/changing manhattan
     if (cur_xs!=xs || cur_ys!=ys) {
-      await get_loc_data();
+      // await get_loc_data();
+      await get_loc_data_bin();
     }
     var sdata = loc_data;
     cur_xs = xs;
@@ -638,7 +860,7 @@ var bar_thresh = 0.05;
               .attr("transform", "rotate(-90)")
               .attr("y", -margin.left+10)
               .attr("x", -margin.top+85)
-              .text("log10 adjusted p-value")
+              .text("-log10 adjusted p-value")
 
     var vol_mousemove = function(e, d) {
       console.log("in vol_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
@@ -679,15 +901,20 @@ var bar_thresh = 0.05;
          .style("top", (e.pageY +10) +"px")
          .style("color", "lime")
          //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
-         .text(info_dict[d.metabolite]["desc"] +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
     // Build Y scales and axis:
     vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
     vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
+    vol_p_min = d3.min(d3.map(loc_data, d=>d.pvalue));
 
     vol_x = d3.scaleLinear()
               .range([ 0, width ])
               .domain([vol_s_min, vol_s_max])
+
+    vol_y = d3.scaleLinear()
+              .range([ height, 0 ])
+              .domain([-Math.log10(max_pval), -Math.log10(vol_p_min)]);
           
     volcano_svg.append("g")
               .attr("id", "xaxis")
@@ -727,7 +954,7 @@ var bar_thresh = 0.05;
                 .enter()
                 .append("circle")
                   .attr("cx", function (d) { return vol_x(d.beta); } )
-                  .attr("cy", function (d) { return vol_y(Math.log10(d.pvalue)); } )
+                  .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                   .attr("r", 5)
                   .style("fill", d=> vol_color(d.pvalue))
               .on("mouseover", vol_tooltip)
@@ -752,7 +979,11 @@ var bar_thresh = 0.05;
     //const sdata = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < max_pval});
     // get new location data
     if (cur_xs!=xs || cur_ys!=ys) {
-      await get_loc_data();
+      updateStatus =true;
+      loading_ui();
+      // await get_loc_data();
+      await get_loc_data_bin();
+      loaded_ui();
     }
     cur_xs=xs;
     cur_ys=ys;
@@ -760,10 +991,14 @@ var bar_thresh = 0.05;
 
     vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
     vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
+    vol_p_min = d3.min(d3.map(loc_data, d=>d.pvalue));
     // axis
     vol_x = d3.scaleLinear()
               .range([ 0, width ])
-              .domain([vol_s_min, vol_s_max])
+              .domain([vol_s_min, vol_s_max])              
+    vol_y = d3.scaleLinear()
+              .range([ height, 0 ])
+              .domain([-Math.log10(max_pval), -Math.log10(vol_p_min)]);
 
     // Build color scale
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
@@ -772,8 +1007,7 @@ var bar_thresh = 0.05;
     console.log("cmax:" +cmax)
     vol_color = d3.scaleSequential()
                   .interpolator(d3.interpolateBlues)
-                  .domain([cmax, Number.MIN_VALUE]);
-    let max_pval= 1;
+                  .domain([cmax, Number.MIN_VALUE]);   
 
     volcano_svg.select("g#yaxis")
                .call(d3.axisLeft(vol_y));
@@ -794,7 +1028,7 @@ var bar_thresh = 0.05;
                .data(sdata)
                .join()
                 .attr("cx", function (d) { return vol_x(d.beta); } )
-                .attr("cy", function (d) { return vol_y(Math.log10(d.pvalue)); } )
+                .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                 .attr("r", 5)
                .style("fill", d=> vol_color(d.pvalue));
     
@@ -943,7 +1177,7 @@ var bar_thresh = 0.05;
          .style("top", (e.pageY +10) +"px")         
          .style("color", "lime")
          //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
-         .text(info_dict[d.metabolite]["desc"] +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
 
     bar_svg.selectAll("myRect")
@@ -995,7 +1229,11 @@ var bar_thresh = 0.05;
     console.log("in change_bar; xs:" +xs, "; ys:" +ys);
     
     if (cur_xs!=xs || cur_ys!=yes) {
-      await get_loc_data();
+      updateStatus = true;
+      loading_ui();
+      //await get_loc_data();
+      await get_loc_data_bin();
+      loaded_ui();
     }
     cur_xs = xs;
     cur_ys = ys;
@@ -1103,15 +1341,15 @@ var bar_thresh = 0.05;
     switch(fieldName) {
       case "beta":
         display_text = "Effect Size";
-        msg = "Heatmap of " +display_text +" on Macula by " +met;
+        msg = display_text +" Heatmap of " +met +" on Macula" ;
         break;
       case "pvalue":
         display_text = "p-value";
-        msg = "Heatmap of " +display_text +" on Macula by " +met;
+        msg = "Adjusted p-value Heatmap of " +met +" on Macula";
         break;
       case "meanThick":
         display_text = "Mean Retinal Thickness";
-        msg = "Heatmap of " +display_text;
+        msg = display_text +" Heatmap";
         break;
     }
     if (freeze_mac) {
@@ -1139,6 +1377,69 @@ var bar_thresh = 0.05;
   }
 
 render();
+
+// filter function
+function filterBiomarkers() {
+  // Declare variables
+  var input, filter, table, tr, td, i, txtValue, tbody_new, tbody_old;
+  input = document.getElementById("myInput");
+  filter = input.value.toLowerCase();
+  table = document.getElementById("myTable");
+  tbody_old = table.tBodies[0];
+  tbody_new = document.createElement("tbody");
+  /*
+  var filtered_biomarkers = Object.keys(info_dict)
+                                  .filter((key) => key.includes(filter))
+                                  .map((key) => { return info_dict[key] });
+  */  
+  var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.indexOf(filter) > -1 || d.desc.indexOf(filter) > -1 });
+  table.style.display = "";
+  // add biomarker matching search
+  if (filtered_biomarkers.length==0) {
+    tr = document.createElement("tr");
+    td = document.createElement("td");
+    td.innerHTML = "No matching biomarkers found";
+    let td_colspan = document.createAttribute("colspan");
+    td_colspan.value=3;
+    td.setAttributeNode(td_colspan);
+    tr.appendChild(td);
+    tbody_new.appendChild(td);
+    //table.appendChild(tr);
+    tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
+  } else {
+    for (let i=0; i<Math.min(filtered_biomarkers.length, 10); i++) {
+      tr = document.createElement("tr");
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers[i].bmarker;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers[i].desc;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = d3.format(".2%")(filtered_biomarkers[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);
+      tr.appendChild(td);
+      
+      let tr_event = document.createAttribute("onclick");
+      tr_event.value = "on_biomarker_click('" +filtered_biomarkers[i].bmarker +"')";
+      tr.setAttributeNode(tr_event);
+      tbody_new.appendChild(tr);
+    }    
+    tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
+  }
+}
+
+function on_biomarker_click(biomarker) {
+  console.log(biomarker);
+  // UI
+  var input = document.getElementById("myInput");
+  input.value = biomarker;
+  var table = document.getElementById("myTable");
+  table.style.display = "none"; // hide table
+  
+  // repaint heatmaps
+  change_macula(biomarker, "beta");
+  change_macula(biomarker, "pvalue");
+}
 </script>
 
 </body>
