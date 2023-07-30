@@ -7,7 +7,6 @@
 <script src="sources/bootstrap.bundle.min.js"></script>
 <script src="sources/d3.min.js"></script>
 <script src="sources/pako.js"></script>
-<!-- <script src="sources/jquery-3.6.1.min.js"></script> -->
 
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -122,9 +121,8 @@
 
 <script>
 var updateStatus = false;
-
 var COLOR_LIME = "rgb(50, 205, 50)";
-//var max_size = Math.min(document.body.clientWidth, 1600)/2;
+
 var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
 var margin = {top: 75, right: 70, bottom: 30, left:35},
     width = max_size - margin.left - margin.right,
@@ -164,20 +162,6 @@ var max_pval = 1;
 //var MIN_PVALUE = Number.MIN_VALUE;
 var MIN_PVALUE = 1e-10;              
 var vol_y;  // now updated in render_volcano and change_volcano
-/*
-var vol_y = d3.scaleLinear()
-              .range([ height, 0 ])
-              .domain([-Math.log10(max_pval), -Math.log10(MIN_PVALUE)]);
-  vol_y = d3.scalePow()
-            .exponent(0.1)
-            .range([ height, 0 ])
-            .domain([max_pval, 0.0])
-            */
-  /* too skewed by Number.MIN_VALUE or cmin
-  vol_y = d3.scaleLog()
-            .range([ height, 0 ])
-            .domain([max_pval, MIN_PVALUE])
-*/
 var vol_color;
 var vol_s_min;
 var vol_s_max;
@@ -234,7 +218,6 @@ var bar_thresh = 0.05;
     let met_promise = get_met_data_bin(); // using compressed files
     myPromises.push(met_promise);
 
-    // let loc_promise = get_loc_data();   // files already small
     let loc_promise = get_loc_data_bin();  // using compressed files - even smaller
     myPromises.push(loc_promise);       // needed it for 1st display
 
@@ -250,7 +233,6 @@ var bar_thresh = 0.05;
 
       let curDict = { "bmarker":d.Biomarker, "desc":d.Description, "group":d.Group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC }
       info_dict[d.Biomarker] = curDict;
-      //info_array.push(curDict);
       return curDict;
     });
   }
@@ -293,71 +275,6 @@ var bar_thresh = 0.05;
     });
     return myPromise;
   }
-  /*
-  async function get_thickness_data_bin() {
-    let fpath = "data/mean_thickness.gz";
-    const req = new XMLHttpRequest();
-    let asyncFlag = true;
-    req.open("GET", fpath, asyncFlag);
-    req.responseType = "arraybuffer";
-    
-    console.log("get_thickness_data_bin; before load");
-
-    req.onload = (event) => {
-      console.log("get_thickness_data_bin; on load");
-
-      const arrayBuffer = req.response; // Note: not req.responseText
-      if (arrayBuffer) {
-        console.log("get_thickness_data_bin; in arrayBuffer");
-
-        //const byteArray = new Uint8Array(arrayBuffer);
-        //var data = pako.inflate(byteArray);
-        // another alternative - https://developer.mozilla.org/en-US/docs/Web/API/DecompressionStream/DecompressionStream
-        var curData = pako.inflate(arrayBuffer);
-        console.log("get_thickness_data_bin; after deflate: " +curData.length);
-
-        //console.log(curData);
-        var data_str = new TextDecoder().decode(curData);
-        console.log("get_thickness_data_bin; after decode: " +data_str.length);
-
-        //console.log(data_str);
-        thickness_data = d3.csvParse(data_str, function(d) {
-          return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
-        });
-      }
-    };
-    
-    req.onerror = (event) => {
-      console.log("error: " +event);
-    }
-
-    req.onreadystatechange = () => {
-      console.log("in onreadystatechange");
-
-      // In local files, status is 0 upon success in Mozilla Firefox
-      if (req.readyState === XMLHttpRequest.DONE) {
-        const status = req.status;
-        if (status === 0 || (status >= 200 && status < 400)) {
-          //console.log(req.responseText);  // for text response NOT arraybuffer
-          console.log("success state");  // The request has been completed successfully
-        } else {
-          console.log("error state");  // Oh no! There has been an error with the request!
-        }
-      }
-    };
-
-    console.log("get_thickness_data_bin; before send");
-    req.send(null);    
-    console.log("get_thickness_data_bin; after send");
-  }
-  */
-  async function get_thickness_data() {
-    //let fpath = "data/mean_thickness.gz"; // direct call doesn't work - need to check header and enable decompress
-    let fpath = "data/mean_thickness.csv";    
-    thickness_data = await d3.csv(fpath, function(d) {
-      return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
-    });
-  }
   function loading_ui() {
     if (!updateStatus) {  // first load
       document.getElementById("loadingData").style.display = "inherit";
@@ -375,46 +292,6 @@ var bar_thresh = 0.05;
       // document.getElementById("bodyContainer").classList.remove("spinner-grow", "m5");
       document.getElementById("bodyContainer").classList.remove("bg-secondary");
     }
-  }
-  async function get_loc_data() {
-    // NB python code swapped x,y; x should range 1-256, and y from 1-128
-    let fpath = "data/metabolomics_data_export/location_summary/location_summary_" +cur_ys +"_" +cur_xs +".csv";
-    /*
-    loc_data = await d3.csv(fpath, function(d) {
-      let temp = parseFloat(d.adjPVal);
-      return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
-    });
-    */
-    
-    let myPromise = new Promise(function(resolve) {
-      const req = new XMLHttpRequest();
-      let asyncFlag = true;
-      req.open("GET", fpath, asyncFlag);
-      //req.responseType = "arraybuffer"; // actually text
-      
-      console.log("get_loc_data; before load");
-      req.onload = (event) => {
-        console.log("get_loc_data; on load");
-        
-        if (req.status==200) {
-          const data_str = req.response; // Note: not req.responseText
-          console.log("get_loc_data; data_str: " +data_str.length);
-
-          loc_data = d3.csvParse(data_str, function(d) {
-            let temp = parseFloat(d.adjPVal);
-            //return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp};
-            return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp};
-          });
-          resolve(loc_data);
-        } else {
-          console.log("File not found: " + fpath);
-          resolve(null);
-        }
-      };
-      req.send(null);
-    });
-    
-    return myPromise;
   }
   async function get_loc_data_bin() {
     // NB python code swapped x,y; x should range 1-256, and y from 1-128
@@ -460,7 +337,6 @@ var bar_thresh = 0.05;
     let fpath = "data/metabolomics_data_export/long_v2/" +cur_met +".csv";
     met_data = await d3.csv(fpath, function(d) {
       let temp = parseFloat(d.adjPVal);
-      //return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
       return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
     });
   }  
@@ -489,7 +365,6 @@ var bar_thresh = 0.05;
 
           met_data = d3.csvParse(data_str, function(d) {
             let temp = parseFloat(d.adjPVal);
-            //return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp==0? MIN_PVALUE:temp };
             return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
           });
           resolve(met_data);
@@ -511,17 +386,6 @@ var bar_thresh = 0.05;
 
     //Read the data
     console.log("before data load");
-    /*
-    await get_data();
-    //let fpath = "data/metabolomics_data_export/long/alldata.csv";
-    console.log("after data load");
-
-    render_mac("Total_C", "beta");
-    render_mac("Total_C", "pvalue");
-    render_mac(null, "meanThick");
-    render_volcano(cur_xs, cur_ys);
-    render_bar(cur_xs, cur_ys);
-    */
     
     loading_ui();
     let myPromises = await get_data();
@@ -591,11 +455,6 @@ var bar_thresh = 0.05;
     } else {      
       color_ticks = d3.ticks(cmin, cmax, NUM_SLICES);
       yrange = d3.range(1, color_ticks.length+1);
-      /*
-      y_fieldName = d3.scaleBand()
-                        .range([ height, 0 ])
-                        .domain(d3.sort(d3.union(csv_y_fieldName)))
-                        */
       
       for (let subdx=0; subdx < color_ticks.length; subdx++) {
         let temp = {"y":yrange[subdx]}
@@ -613,7 +472,6 @@ var bar_thresh = 0.05;
       .enter()
       .append("rect")
       .attr("x", function(d) { return 1 })
-      //.attr("y", function(d) { return y_fieldName(d[fieldName]) })
       .attr("y", function(d) { return y_fieldName(d.y) })
       .attr("width", bandwidth )
       .attr("height", y_fieldName.bandwidth() )
@@ -645,11 +503,6 @@ var bar_thresh = 0.05;
                     .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
     } else {
-      /*
-      mac_color = d3.scaleSequential()
-                    .interpolator(d3.interpolateRdBu)
-                    .domain([cmax, cmin]);
-                    */
       if (cmin<0 && cmax>0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateRdBu)
@@ -693,7 +546,6 @@ var bar_thresh = 0.05;
       target_svg.append("circle")
                 .attr("cx", mac_xfunc2(NUM_COORDS/2))
                 .attr("cy", mac_yfunc2(NUM_SLICES/2))
-                //.attr("r", mac_xfunc2(NUM_COORDS/2))
                 .attr("r", mac_yfunc2(radii[rdx]))
                 .style("stroke","black")
                 .style("stroke-width", 2)
@@ -827,7 +679,6 @@ var bar_thresh = 0.05;
     // get new snip data
     if (fieldName!="meanThick") { // only highlight new coord if meanThick
       cur_met = met;
-      // await get_met_data();
       updateStatus = true;
       loading_ui();
       await get_met_data_bin(); // using compressed files      
@@ -858,7 +709,6 @@ var bar_thresh = 0.05;
 
     // when rendering/changing manhattan
     if (cur_xs!=xs || cur_ys!=ys) {
-      // await get_loc_data();
       await get_loc_data_bin();
     }
     var sdata = loc_data;
@@ -916,7 +766,6 @@ var bar_thresh = 0.05;
          .style("left", (e.pageX +10) +"px")
          .style("top", (e.pageY +10) +"px")
          .style("color", "lime")
-         //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
          .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
     // Build Y scales and axis:
@@ -999,7 +848,6 @@ var bar_thresh = 0.05;
     if (cur_xs!=xs || cur_ys!=ys) {
       updateStatus =true;
       loading_ui();
-      // await get_loc_data();
       await get_loc_data_bin();
       loaded_ui();
     }
@@ -1049,17 +897,7 @@ var bar_thresh = 0.05;
                 .attr("cx", function (d) { return vol_x(d.beta); } )
                 .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                 .attr("r", 5)
-               .style("fill", d=> vol_color(-Math.log10(d.pvalue)));
-    
-    /* removed as still too messy
-    volcano_svg.selectAll(".scattertext")
-                .data(sdata)
-                .join()
-                  .attr("x", function (d) { return vol_x(d.beta) + 5; } )
-                  .attr("y", function (d) { return vol_y(d.pvalue) - 5; } )
-                  .attr("transform", d => "rotate(-45 " + vol_x(d.beta) + " " + vol_y(d.pvalue) + " ) ")
-                  .text(label_metabolites)
-    */
+               .style("fill", d=> vol_color(-Math.log10(d.pvalue)));    
 	}
 
   async function render_bar(xs, ys) {
@@ -1075,7 +913,6 @@ var bar_thresh = 0.05;
   
     // only significant metabolites and sorted
     let fieldName = "beta";
-    //let data_filtered = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < bar_thresh} );
     let data_filtered = d3.filter(loc_data, d => {return d.pvalue < bar_thresh} );
     let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
     
@@ -1088,32 +925,6 @@ var bar_thresh = 0.05;
           .attr("class", "h5")
           .text(make_bar_msg(xs, ys));
 
-    /* for horizontal bars
-    bar_svg.append("text")
-            .attr("text-anchor", "end")
-            .attr("x", bar_width +10)
-            .attr("y", height + 25)
-            .text("Effect Size");
-
-    // Add X axis - same as volcano
-    bar_svg.append("g")
-          .classed('x-axis', true)
-          .attr("transform", "translate(0," + height + ")")
-          .call(d3.axisBottom(vol_x))
-          .selectAll("text")
-          .attr("transform", "translate(-10,0)rotate(-45)")
-          .style("text-anchor", "end");
-
-    // Y axis
-    var y = d3.scaleBand()
-              .range([ 0, height ])
-              .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
-              //.padding(.1);
-    
-    bar_svg.append("g")
-      .classed('y-axis', true)
-      .call(d3.axisLeft(y));
-    */
     // swap axis    
     bar_svg.append("text")
             .attr("text-anchor", "end")
@@ -1195,7 +1006,6 @@ var bar_thresh = 0.05;
          .style("left", (e.pageX +10) +"px")
          .style("top", (e.pageY +10) +"px")         
          .style("color", "lime")
-         //.text(d.metabolite +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
          .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
 
@@ -1203,24 +1013,6 @@ var bar_thresh = 0.05;
             .data(data_filtered_sorted)
             .enter()
             .append("rect")
-            /* for horizontal bars
-            .attr("y", function(d) { return y(d.metabolite); })
-            .attr("height", y.bandwidth() )
-            .attr("x", function(d) { 
-              if (d[fieldName]>0) {
-                return vol_x(0);
-              } else {
-                return vol_x(d[fieldName]); 
-              }
-            })
-            .attr("width", function(d) { 
-              if (d[fieldName]>0) { 
-                return vol_x(d[fieldName]) - vol_x(0); 
-              } else {
-                return -(vol_x(d[fieldName]) - vol_x(0)); 
-              }
-            })
-            */
             .attr("x", function(d) { return bar_x(d.metabolite); })
             .attr("width", bar_x.bandwidth() )
             .attr("y", function(d) { 
@@ -1250,7 +1042,6 @@ var bar_thresh = 0.05;
     if (cur_xs!=xs || cur_ys!=yes) {
       updateStatus = true;
       loading_ui();
-      //await get_loc_data();
       await get_loc_data_bin();
       loaded_ui();
     }
@@ -1264,22 +1055,9 @@ var bar_thresh = 0.05;
     
     // only significant metabolites and sorted
     let fieldName = "beta";
-    //let data_filtered = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < bar_thresh} );
     let data_filtered = d3.filter(loc_data, d => {return d.pvalue < bar_thresh} );
     let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
 
-    /* for horizontal bars
-    // Y axis
-    var y = d3.scaleBand()
-              .range([ 0, height ])
-              .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
-              //.padding(.1);
-    
-    bar_svg.selectAll(".y-axis").remove();
-    bar_svg.append("g")
-          .classed('y-axis', true)
-          .call(d3.axisLeft(y));
-    */
     // Add Y axis - same as volcano X axis
     let bar_y = d3.scaleLinear()
                   .range([ 0, height])
@@ -1312,24 +1090,6 @@ var bar_thresh = 0.05;
             .data(data_filtered_sorted)
             .enter()
             .append("rect")
-            /* for horizontal bars
-            .attr("y", function(d) { return y(d.metabolite); })
-            .attr("height", y.bandwidth() )
-            .attr("x", function(d) { 
-              if (d[fieldName]>0) {
-                return vol_x(0);
-              } else {
-                return vol_x(d[fieldName]); 
-              }
-            })
-            .attr("width", function(d) { 
-              if (d[fieldName]>0) { 
-                return vol_x(d[fieldName]) - vol_x(0); 
-              } else {
-                return -(vol_x(d[fieldName]) - vol_x(0)); 
-              }
-            })
-            */
             .attr("x", function(d) { return bar_x(d.metabolite); })
             .attr("width", bar_x.bandwidth() )
             .attr("y", function(d) { 
@@ -1406,11 +1166,7 @@ function filterBiomarkers() {
   table = document.getElementById("myTable");
   tbody_old = table.tBodies[0];
   tbody_new = document.createElement("tbody");
-  /*
-  var filtered_biomarkers = Object.keys(info_dict)
-                                  .filter((key) => key.includes(filter))
-                                  .map((key) => { return info_dict[key] });
-  */  
+
   var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.indexOf(filter) > -1 || d.desc.indexOf(filter) > -1 });
   table.style.display = "";
   // add biomarker matching search
