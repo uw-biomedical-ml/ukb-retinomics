@@ -333,13 +333,6 @@ var bar_thresh = 0.05;
     
     return myPromise;
   }
-  async function get_met_data() {
-    let fpath = "data/metabolomics_data_export/long_v2/" +cur_met +".csv";
-    met_data = await d3.csv(fpath, function(d) {
-      let temp = parseFloat(d.adjPVal);
-      return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
-    });
-  }  
   async function get_met_data_bin() {
     let fpath = "data/metabolomics_data_export/gzip/" +cur_met +".csv.gz";
     
