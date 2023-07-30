@@ -29,9 +29,6 @@
         <a class="nav-link active" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="./prs.html">PRS</a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link disabled" href="./icd10.html">ICD10</a>
       </li>
       <li class="nav-item">
@@ -39,6 +36,9 @@
       </li>
       <li class="nav-item">
         <a class="nav-link disabled" href="./infections.html">Infections</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link disabled" href="./prs.html">PRS</a>
       </li>
     </ul>
   </div>
@@ -629,7 +629,7 @@ var bar_thresh = 0.05;
     }
   }
   
-   function make_mac_color(fieldName, cmin, cmax) {
+  function make_mac_color(fieldName, cmin, cmax) {
     console.log("in make_mac_color; fieldName:" +fieldName +"; cmin:" +cmin +"; cmax:" +cmax);
 
     var mac_color;
@@ -645,9 +645,25 @@ var bar_thresh = 0.05;
                     .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
     } else {
+      /*
       mac_color = d3.scaleSequential()
                     .interpolator(d3.interpolateRdBu)
                     .domain([cmax, cmin]);
+                    */
+      if (cmin<0 && cmax>0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateRdBu)
+                      .domain([cmax, cmin]);
+      } else if (cmin<0 && cmax<0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateBlues)
+                      .domain([cmax, cmin]);
+      } else if (cmin>0 && cmax>0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateReds)
+                      .domain([cmin, cmax]);
+      }
+
     }
     return mac_color;
   }
@@ -932,7 +948,9 @@ var bar_thresh = 0.05;
     // 1 color shade and different heatmap colors!
     var vol_color = d3.scaleSequential()
                       .interpolator(d3.interpolateBlues)
-                      .domain([cmax, Number.MIN_VALUE]);
+                      //.domain([cmax, Number.MIN_VALUE]);
+                      //.domain([0.05, Number.MIN_VALUE]);
+                      .domain([-Math.log10(0.05), -Math.log10(cmin)]);
 
     /* // removed text labels as still too messy
     volcano_svg.append('g')
@@ -956,7 +974,7 @@ var bar_thresh = 0.05;
                   .attr("cx", function (d) { return vol_x(d.beta); } )
                   .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                   .attr("r", 5)
-                  .style("fill", d=> vol_color(d.pvalue))
+                  .style("fill", d=> vol_color(-Math.log10(d.pvalue)))
               .on("mouseover", vol_tooltip)
               //.on("mousemove", vol_mousemove)
               //.on("mousedown", vol_mouseclick)
@@ -1007,7 +1025,8 @@ var bar_thresh = 0.05;
     console.log("cmax:" +cmax)
     vol_color = d3.scaleSequential()
                   .interpolator(d3.interpolateBlues)
-                  .domain([cmax, Number.MIN_VALUE]);   
+                  //.domain([cmax, Number.MIN_VALUE]);
+                  .domain([-Math.log10(0.05), -Math.log10(cmin)]);
 
     volcano_svg.select("g#yaxis")
                .call(d3.axisLeft(vol_y));
@@ -1030,7 +1049,7 @@ var bar_thresh = 0.05;
                 .attr("cx", function (d) { return vol_x(d.beta); } )
                 .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                 .attr("r", 5)
-               .style("fill", d=> vol_color(d.pvalue));
+               .style("fill", d=> vol_color(-Math.log10(d.pvalue)));
     
     /* removed as still too messy
     volcano_svg.selectAll(".scattertext")
