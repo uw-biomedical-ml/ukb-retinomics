@@ -517,7 +517,7 @@ var bar_thresh = 0.05;
   }
 
   function highlight_coord(target_svg, new_xs, new_ys) {
-    console.log("in highlight_coord: ", target_svg +"; xs:" +new_xs +"; ys:" +new_ys);
+    console.log("in highlight_coord: xs:" +new_xs +"; ys:" +new_ys);
 
     let prev_elem = target_svg.selectAll("rect[x='" +mac_xfunc(cur_xs) +"'][y='" + mac_yfunc(cur_ys) +"']");
     prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
