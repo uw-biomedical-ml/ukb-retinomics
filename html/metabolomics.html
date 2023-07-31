@@ -793,16 +793,16 @@ var bar_thresh = 0.05;
          .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
     // Get axis domains:
-    let loc_beta = d3.map(loc_data, d=>d.beta);
-    vol_s_min = d3.min(loc_beta);
-    vol_s_max = d3.max(loc_beta);
-    let loc_pval = d3.map(loc_data, d=>d.pvalue);
+    let loc_betas = d3.map(loc_data, d=>d.beta);
+    vol_s_min = d3.min(loc_betas);
+    vol_s_max = d3.max(loc_betas);
+    let loc_pvals = d3.map(loc_data, d=>d.pvalue);
     /*
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
     */
-    const cmin = d3.min(loc_pval);
-    const cmax = d3.max(loc_pval);
+    const cmin = d3.min(loc_pvals);
+    const cmax = d3.max(loc_pvals);
     console.log("cmin:" +cmin)
     console.log("cmax:" +cmax)
 
@@ -886,26 +886,28 @@ var bar_thresh = 0.05;
     }
     var sdata = loc_data;
 
-    vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
-    vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
-    vol_p_min = d3.min(d3.map(loc_data, d=>d.pvalue));
+    // data range
+    /*
+    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
+    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
+    */
+    let loc_pvals = d3.map(sdata, d=>d.pvalue);
+    const cmin = d3.min(loc_pvals);
+    const cmax = d3.max(loc_pvals);
+    console.log("cmin:" +cmin)
+    console.log("cmax:" +cmax)
+    let loc_betas = d3.map(loc_data, d=>d.beta);
+    vol_s_min = d3.min(loc_betas);
+    vol_s_max = d3.max(loc_betas);
     // axis
     vol_x = d3.scaleLinear()
               .range([ 0, width ])
               .domain([vol_s_min, vol_s_max])              
     vol_y = d3.scaleLinear()
               .range([ height, 0 ])
-              .domain([-Math.log10(max_pval), -Math.log10(vol_p_min)]);
+              .domain([-Math.log10(max_pval), -Math.log10(cmin)]);
 
     // Build color scale
-    /*
-    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
-    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
-    */
-    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0);
-    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 1);
-    console.log("cmin:" +cmin)
-    console.log("cmax:" +cmax)
     vol_color = d3.scaleSequential()
                   .interpolator(d3.interpolateBlues)
                   //.domain([cmax, Number.MIN_VALUE]);
