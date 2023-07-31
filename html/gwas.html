@@ -57,25 +57,22 @@
         <a class="nav-link" href="./index.html">Home</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
-      </li>
-      <li class="nav-item">
         <a class="nav-link active" href="./gwas.html">GWAS</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">PRS</a>
+        <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Immunomics Blood</a>
+        <a class="nav-link disabled" href="./icd10.html">ICD10</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Immunomics Infect</a>
+        <a class="nav-link disabled" href="./hematology.html">Hematology</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Phenomics ICD10</a>
+        <a class="nav-link disabled" href="./infections.html">Infections</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="#">Phenomics Charlson</a>
+        <a class="nav-link disabled" href="./prs.html">PRS</a>
       </li>
     </ul>
   </div>
@@ -99,9 +96,10 @@
     <table id="myTable" style="display:none";>
       <thead>
         <tr class="header">
-          <th style="width:40%;">SNP</th>
-          <th style="width:20%;">Chromsome</th>
-          <th style="width:40%;">% of Macula area</th>
+          <th style="width:20%;">SNP</th>
+          <th style="width:10%;">Chromosome</th>
+          <th style="width:30%;">% of Macula area</th>
+          <th style="width:40%;">Available</th>
         </tr>
       </thead>
       <tbody>
@@ -146,7 +144,7 @@
       <h5>Usage Guide</h5>
       <ul>
         <li>Click a heatmap to load manhanttan plots for selected macula location</li>
-        <li>Click a SNP in manhattan plot to load its heatmaps and focus on SNP</li>
+        <li>Click a SNP in manhattan plot to load its heatmaps and zoom on SNP</li>
         <li>Search for SNPs directly, select them and see their heatmaps</li>
       </ul>
     </div>
@@ -159,14 +157,15 @@
 var updateStatus = false;
 
 var COLOR_LIME = "rgb(50, 205, 50)";
-//var max_size = Math.min(document.body.clientWidth, 1600)/2;
 var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
-var margin = {top: 80, right: 70, bottom: 30, left: 40},
+var margin = {top: 75, right: 70, bottom: 30, left:35},
     width = max_size - margin.left - margin.right,
     height = max_size - margin.top - margin.bottom;
 console.log(width +";" +height);
-var colorbar_width = margin.left+10;
+var colorbar_width = margin.left+10+25;
 var heatmap_bar_width =10;
+var manhattan_zoom_width = width;
+var manhattan_full_width = manhattan_zoom_width*2;
 
 var thickness_data;
 var SNP_info_data;
@@ -184,13 +183,13 @@ var PIXEL_TO_MICRONS_THICKNESS = (2.275*1000)/650 / 1000000;
 var CHR_NUM_SLIPS_DICT = {"1": 842491, "2":913413, "3":774528, "4":796789, "5":706769, "6":733026, "7":639645, "8":600401, "9":468652, "10":553430, "11":539166, "12":524442, "13":398578, "14":353816, "15":309546, "16":335728, "17":293820, "18":309206, "19":252330, "20":240886, "21":148455, "22":149315, "X":354574};
 
 var mac_xfunc = d3.scaleBand().range([ 0, width ]).domain(d3.range(1, NUM_COORDS+1));
-//var mac_xfunc2 = d3.scaleBand().range([ 0, width ]).domain(d3.sort(d3.union(d3.range(1, NUM_COORDS+1), [NUM_COORDS/2-NUM_COORDS/6, NUM_COORDS/2-NUM_COORDS/12, NUM_COORDS/6, NUM_COORDS/12])));
 var mac_xfunc2 = d3.scaleLinear().range([ 0, width ]).domain([1, NUM_COORDS]);
 var mac_yfunc = d3.scaleBand().range([ 0, height ]).domain(d3.range(1, NUM_SLICES+1));
 var mac_yfunc2 = d3.scaleLinear().range([ 0, height ]).domain([1, NUM_SLICES]);
 
 var cur_chr = 22;
 var cur_SNP = "rs9330813";
+var prev_SNP;
 // NB python code swapped x,y; x should range 1-256, and y from 1-128
 var cur_xs = 76;
 var cur_ys = 62;
@@ -201,6 +200,9 @@ var manhattan_x;
 var manhattan_y;
 var manhattan_color;
 var manhattan_thresh = 5e-8 / 119 / 246;
+var manhattan_mousemove;
+var manhattan_mouseclick;
+var manhattan_tooltip;
 
 var freeze_manhattan = false;
 var freeze_mac = false;
@@ -243,8 +245,8 @@ var freeze_mac = false;
     let domID = "#manhattan" +"_" +resolution;
     manhattan_svgs[resolution] = d3.select(domID)
                                     .append("svg")
-                                    .attr("width", width + margin.left + margin.right)
-                                    .attr("height", height + margin.top + margin.bottom)
+                                    .attr("width", (resolution=="full"? manhattan_full_width:manhattan_zoom_width) +margin.left +margin.right)
+                                    .attr("height", height +margin.top +margin.bottom)
                                     .append("g")
                                     .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   }
@@ -269,34 +271,21 @@ var freeze_mac = false;
   async function get_data() {
     var myPromises = [];
         
-    //await get_thickness_data();
     let thickness_promise = get_thickness_data_bin(); // using compressed files
     myPromises.push(thickness_promise);
 
     let SNP_promise = get_SNP_data_bin();       // using compressed files
     myPromises.push(SNP_promise);
 
-    //let info_promise = get_info_data_bin();     // using compressed files (only significant SNPs)
-    // myPromises.push(info_promise);              
     await get_info_data_bin();                    // needed for position info for manhattan along with loc_data
     let info_all_promise = get_info_data_all_bin();        // async (all SNPs)
     // myPromises.push(info_all_promise);       // not needed immediately and LARGE!
 
-    //await get_loc_data();
     let loc_promise = get_loc_data_bin();       // using compressed files
     myPromises.push(loc_promise);    
 
     return myPromises;
   }
-  /*
-  async function get_info_data() {
-    let fpath = "data/gwas/chr" +cur_chr +"/snip_info_" +cur_chr +".csv";
-    snip_info_data = await d3.csv(fpath, function(d) {
-      return { "snip": d.snip, "chr": d.chr, "pos": parseInt(d.pos), "A1":d.A1 };
-    });
-    snip_info_data.forEach(d => snip_info_dict[d.snip] = {"pos":d.pos, "A1":d.A1, "chr":d.chr} );
-  }
-  */
   async function get_info_data_bin() {
     let fpath = "data/gwas/info_sigSNPs.csv.gz";
 
@@ -321,8 +310,8 @@ var freeze_mac = false;
           console.log("get_info_data_bin; after decode: " +data_str.length);
 
           SNP_info_data = d3.csvParse(data_str, function(d) {
-            SNP_info_dict[d.SNP] = {"pos":d.pos, "A1":d.A1, "chr":d.chr};
-            return { "SNP": d.SNP, "chr":d.chr, "A1":d.A1, "pos":d.pos, "num_sig":d.num_sig, "bonf":d.bonf };
+            SNP_info_dict[d.SNP] = {"pos":parseInt(d.pos), "A1":d.A1, "chr":d.chr, "sentinel":parseInt(d.sentinel)};
+            return { "SNP": d.SNP, "chr":d.chr, "A1":d.A1, "pos":parseInt(d.pos), "num_sig":parseInt(d.num_sig), "bonf":d.bonf!="N"};
           });
           resolve(SNP_info_data);
         } else {
@@ -411,23 +400,6 @@ var freeze_mac = false;
     });
     return myPromise;
   }
-  /*
-  async function get_thickness_data() {
-    let fpath = "data/mean_thickness.csv";
-    thickness_data = await d3.csv(fpath, function(d) {
-      return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
-    });
-  }
-  async function get_loc_data() {
-    document.getElementById("loadingData").style.display = "inherit";
-    let fpath = "data/gwas/chr" +cur_chr +"/sigSNPs/slice" +cur_ys +"_result.txt";
-    loc_data = await d3.csv(fpath, function(d) {
-      return { "snip": d.ID, "chr": cur_chr, "pos": parseInt(d.POS), "A1":d.A1, "beta": parseFloat(d[cur_ys +"_" +cur_xs +"_BETA"]), "pvalue": parseFloat(d[cur_ys +"_" +cur_xs +"_P"]) };
-    });
-
-    document.getElementById("loadingData").style.display = "none";
-  }
-  */
   async function get_loc_data_bin() {
     let cur_SNP_safe = cur_SNP.includes(":") ? cur_SNP.split(":")[1]:cur_SNP;
     let fpath = "data/gwas/location_summary/loc_summary_" +cur_ys +"_" +cur_xs +".csv.gz";
@@ -453,8 +425,8 @@ var freeze_mac = false;
           console.log("get_loc_data_bin; after decode: " +data_str.length);
 
           loc_data = d3.csvParse(data_str, function(d) {
-            return { "SNP": d.SNP, "chr":d.chr, "pos":SNP_info_dict[d.SNP]["pos"], "beta":d.beta, "pvalue":d.pval};
-            //return { "SNP": d.SNP, "chr":d.chr, "beta":d.beta, "pvalue":d.pval};
+            return { "SNP": d.SNP, "chr":d.chr, "beta":parseFloat(d.beta), "pvalue":parseFloat(d.pval), "pos":SNP_info_dict[d.SNP]["pos"], "sentinel":SNP_info_dict[d.SNP]["sentinel"]};
+            // return { "SNP": d.SNP, "chr":d.chr, "beta":d.beta, "pvalue":d.pval};
           });
           resolve(loc_data);
         } else { 
@@ -467,19 +439,6 @@ var freeze_mac = false;
     }) 
     return myPromise;
   }
-  /*
-  async function get_snip_data() {    
-    document.getElementById("loadingData").style.display = "inherit";
-    let cur_snip_safe = cur_snip.includes(":") ? cur_snip.split(":")[1]:cur_snip;
-    let fpath = "data/gwas/chr" +cur_chr +"/sigSNPs/long/" +cur_snip_safe +".csv";
-    snip_data = await d3.csv(fpath, function(d) {
-      // NB python code swapped x,y; x should range 1-256, and y from 1-128
-      return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.beta), "pvalue":parseFloat(d.pval) };
-    });
-
-    document.getElementById("loadingData").style.display = "none";
-  }
-  */
   async function get_SNP_data_bin() {
     let cur_SNP_safe = cur_SNP.includes(":") ? cur_SNP.split(":")[1]:cur_SNP;
     let fpath = "data/gwas/chr" +cur_chr +"/sigSNPs/gzip/" +cur_SNP_safe +".csv.gz";
@@ -506,7 +465,7 @@ var freeze_mac = false;
           console.log("get_SNP_data_bin; after decode: " +data_str.length);
 
           SNP_data = d3.csvParse(data_str, function(d) {
-            return { "SNP": d.snip, "y":parseInt(d.slice_num), "x":parseInt(d.coord_num), "beta":d.beta, "pvalue":d.pval, "bonf":d.is_bonf};
+            return { "SNP": d.snip, "y":parseInt(d.slice_num), "x":parseInt(d.coord_num), "beta":parseFloat(d.beta), "pvalue":parseFloat(d.pval), "bonf":d.is_bonf!="False"};
           });
           resolve(SNP_data);
         } else { 
@@ -537,13 +496,6 @@ var freeze_mac = false;
       render_manhattan(cur_xs, cur_ys);
       render_manhattan(cur_xs, cur_ys, cur_SNP);
       
-      /*
-      // FIXME - get chromosome wide summary
-      let fpath = "data/chr" +cur_chr +"/sigSNPs/chr_snip.csv";
-      snips_summary_data = await d3.csv(fpath, function(d) {
-        return { "chr": d.chr, "snip": d.snip, "num_sig": parseInt(d.num_sig), "num_sig_strict":parseInt(d.num_sig_strict) };
-      });
-      */
       loaded_ui();
       console.log("after data load");
     })
@@ -583,23 +535,47 @@ var freeze_mac = false;
                       .attr("x", fieldName=="meanThick" ? 15:10)
                       .attr("y", height + 10)
                       .text(d3.format(num_format) (fieldName=="pvalue" ? cmax_transformed:cmin_transformed)+suffix);
-      
-    var csv_y_fieldName = d3.map(sdata, function(d){return d[fieldName]; });  // map field values
+
     // Build colorbar Y scale
-    var y_fieldName = d3.scaleBand()
-      .range([ height, 0 ])
-      .domain(d3.sort(d3.union(csv_y_fieldName)))
+    //var csv_y_fieldName = d3.map(sdata, function(d){return d[fieldName]; });  // map field values
+    var y_fieldName;
+    var color_ticks; 
+    var sdata2 = [];
+    var yrange;
+    if (fieldName=="pvalue") {
+      // color_ticks = d3.ticks(Math.log10(cmin), Math.log10(cmax), NUM_SLICES);  // color in other direction
+      color_ticks = d3.ticks(Math.log10(cmax), Math.log10(cmin), NUM_SLICES);
+      yrange = d3.range(1, color_ticks.length+1);
+      for (let subdx=0; subdx < color_ticks.length; subdx++) {
+        let temp = {"y":yrange[subdx]};
+        temp[fieldName] = Math.pow(10, color_ticks[subdx]);
+        sdata2.push(temp);
+      }
+      sdata =sdata2;
+    } else {      
+      color_ticks = d3.ticks(cmin, cmax, NUM_SLICES);
+      yrange = d3.range(1, color_ticks.length+1);
+      
+      for (let subdx=0; subdx < color_ticks.length; subdx++) {
+        let temp = {"y":yrange[subdx]}
+        temp[fieldName] = color_ticks[subdx];
+        sdata2.push(temp);
+      }
+      sdata = sdata2;
+    }
+    y_fieldName = d3.scaleBand()
+                        .range([ height, 0 ])
+                        .domain(yrange);
 
     target_colorbar_svg.selectAll()
       .data(sdata)
       .enter()
       .append("rect")
       .attr("x", function(d) { return 1 })
-      .attr("y", function(d) { return y_fieldName(d[fieldName]) })
+      .attr("y", function(d) { return y_fieldName(d.y) })
       .attr("width", bandwidth )
       .attr("height", y_fieldName.bandwidth() )
       .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName) )
-      .style("opacity", function(d) { return 1- d.pvalue} )
       .style("stroke-width", 0)
       .style("stroke", d=> extract_macula_heatmap_data(d, mac_color, fieldName) )
   }
@@ -627,9 +603,19 @@ var freeze_mac = false;
                     .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
     } else {
-      mac_color = d3.scaleSequential()
-                    .interpolator(d3.interpolateRdBu)
-                    .domain([cmax, cmin]);
+      if (cmin<0 && cmax>0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateRdBu)
+                      .domain([cmax, cmin]);
+      } else if (cmin<0 && cmax<0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateBlues)
+                      .domain([cmax, cmin]);
+      } else if (cmin>0 && cmax>0) {
+        mac_color = d3.scaleSequential()
+                      .interpolator(d3.interpolateReds)
+                      .domain([cmin, cmax]);
+      }
     }
     return mac_color;
   }
@@ -640,6 +626,14 @@ var freeze_mac = false;
     let prev_elem = target_svg.selectAll("rect[x='" +mac_xfunc(cur_xs) +"'][y='" + mac_yfunc(cur_ys) +"']");
     prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
     let cur_elem = target_svg.selectAll("rect[x='" +mac_xfunc(new_xs) +"'][y='" + mac_yfunc(new_ys) +"']");
+    cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+  }
+  function highlight_SNP(target_svg, svg_name, new_SNP) {
+    console.log("in highlight_SNP: ", svg_name +"; met:" +new_SNP);
+    
+    let prev_elem = target_svg.selectAll("circle[SNP='" +prev_SNP +"']");
+    prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+    let cur_elem = target_svg.selectAll("circle[SNP='" +new_SNP +"']");
     cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
   }
 
@@ -723,10 +717,7 @@ var freeze_mac = false;
         highlight_coord(heatmap_svgs["pvalue"], d.x, d.y);
         highlight_coord(heatmap_svgs["meanThick"], d.x, d.y);
         // update to show on macula heatmaps
-        cur_xs = d.x;
-        cur_ys = d.y;
         change_manhattan(d.x, d.y); 
-        // FIXME find representative SNP for zoom in
       }
     }
 
@@ -770,7 +761,6 @@ var freeze_mac = false;
       .attr("x", 0)
       .attr("y", -50)
       .attr("text-anchor", "left")
-      //.style("font-size", "22px")
       .attr("class", "h5")
       .text(make_macula_msg(SNP, fieldName));
   }
@@ -786,11 +776,15 @@ var freeze_mac = false;
     
     // get new SNP data
     if (fieldName!="meanThick") { // only highlight new coord if meanThick
-      cur_snip = SNP;
-      //await get_SNP_data();
-      loading_ui();
-      await get_SNP_data_bin();
-      loaded_ui();
+      if (cur_SNP!=SNP) {
+        prev_SNP = cur_SNP;
+        cur_SNP = SNP;
+        cur_chr = SNP_info_dict[SNP]["chr"];
+
+        loading_ui();
+        await get_SNP_data_bin();
+        loaded_ui();
+      }
       let sdata = SNP_data;
 
       // Build color scale
@@ -813,12 +807,9 @@ var freeze_mac = false;
 
 	async function render_manhattan(xs, ys, SNP=null) {
     console.log("in render_manhattan: ", "; xs:" +xs, "; ys:" +ys);
+    let width = SNP==null? manhattan_full_width:manhattan_zoom_width;
 
     // when rendering/changing manhattan
-    cur_xs = xs;
-    cur_ys = ys;
-    //await get_loc_data();
-    await get_loc_data_bin();
     var sdata = loc_data;
 
     var target_suffix = SNP==null ? "full":"zoom";
@@ -827,7 +818,7 @@ var freeze_mac = false;
       let cur_SNP_info = SNP_info_dict[SNP];
       sdata = d3.filter(loc_data, d => { return d.chr==cur_SNP_info.chr && Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
     } else {
-      sdata = d3.filter(loc_data, d => { return d.pvalue < manhattan_thresh });
+      sdata = d3.filter(loc_data, d => { return d.sentinel==1; });
     }
 
     var csv_x = d3.map(sdata, function(d){return d.chr;})
@@ -837,26 +828,30 @@ var freeze_mac = false;
                  .attr("text-anchor", "end")
                  .attr("x", width+10)
                  .attr("y", height + 25)
-                 .text("Chromosome");
+                 .text(SNP==null? "Chromosome":"Position");
 
     manhattan_svg.append("text")
                  .attr("text-anchor", "end")
                  .attr("transform", "rotate(-90)")
                  .attr("y", -margin.left+10)
                  .attr("x", -margin.top+85)
-                 .text("p-value")
+                 //.text("p-value")
+                 .text("-log10 p-value")
 
-    var manhattan_mousemove = function(e, d) {
+    manhattan_mousemove = function(e, d) {
       console.log("in manhattan_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
+      // prev_SNP = cur_SNP;
+      // highlight_SNP(manhattan_svgs["full"], "full", d.SNP);
 
       freeze_manhattan = false;
       if (! freeze_mac) { 
         change_macula(d.SNP, "beta"); 
         change_macula(d.SNP, "pvalue"); 
         change_manhattan(xs, ys, d.SNP);
+        // highlight_SNP(manhattan_svgs["zoom"], "zoom", d.SNP);
       }
     }
-    var manhattan_mouseclick = function(e, d) {
+    manhattan_mouseclick = function(e, d) {
       console.log("in manhattan_mouseclick: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
 
       freeze_manhattan = false;
@@ -870,7 +865,7 @@ var freeze_mac = false;
       heatmap_svgs["pvalue"].selectAll("#title")
                             .text(make_macula_msg(d.SNP, "pvalue"));
     }
-    var manhattan_tooltip = function(e, d) {
+    manhattan_tooltip = function(e, d) {
       // remove old tooltips
       d3.select("#div_tooltip").selectAll(".tooltip").remove();
 
@@ -883,12 +878,13 @@ var freeze_mac = false;
          //.style("top", (d3.mouse(this)[1] +10) +"px")
          .style("left", (e.pageX +10) +"px")
          .style("top", (e.pageY +10) +"px")
-         .text(d.SNP +": beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+         //.style("color", "lime")
+         .html(d.SNP +"(chr" +d.chr +"; pos=" +d3.format(".2e")(d.pos) +"):<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
 
     // Build Y scales and axis:
     manhattan_x = make_manhattan_x(sdata, SNP);
-    var myAxis = make_manhattan_xAxis(sdata, manhattan_x);
+    var myAxis = make_manhattan_xAxis(sdata, manhattan_x, SNP);
     manhattan_svg.append("g")
                  .attr("id", "xaxis")
                 .attr("class", "axis")
@@ -898,168 +894,231 @@ var freeze_mac = false;
     manhattan_y = make_manhattan_y(sdata, SNP);
     manhattan_svg.append("g")
                  .attr("id", "yaxis")
-                 .call(d3.axisLeft(manhattan_y).ticks(3).tickFormat(d3.format(".0e")));
-
+                 //.call(d3.axisLeft(manhattan_y).ticks(3).tickFormat(d3.format(".0e")));
+                 .call(d3.axisLeft(manhattan_y));
+    
     // Build color scale
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
     console.log("cmin:" +cmin)
     console.log("cmax:" +cmax)
     // 1 color shade and different heatmap colors!
+    /*
     manhattan_color = d3.scaleSequential()
                         .interpolator(d3.interpolateBlues)
                         .domain([cmax, Number.MIN_VALUE]);
-
-    manhattan_svg.append('g')
-        .selectAll("dot")
-        .data(sdata)
-        .enter()
-        .append("text")
-          .attr("class", "scattertext")
-          .attr("x", function (d) { return manhattan_x(d.pos) + 5; } )
-          .attr("y", function (d) { return manhattan_y(d.pvalue) - 5; } )
-          .attr("text-anchor", "start")
-      .attr("transform", d => "rotate(-45 " + manhattan_x(d.pos) + " " + manhattan_y(d.pvalue) + " ) ")
-      //.text(label_SNPs)
-
+    */
+    manhattan_color = d3.scaleSequential()
+                        .interpolator(d3.interpolateBlues)
+                        .domain([-Math.log10(cmax*100), -Math.log10(cmin)]);
+   
     manhattan_svg.append('g')
         .selectAll("dot")
         .data(sdata)
         .enter()
         .append("circle")
-          .attr("cx", function (d) { return manhattan_x(d.pos); } )
-          .attr("cy", function (d) { return manhattan_y(d.pvalue); } )
+          .attr("SNP", d=> d.SNP)
+          .attr("cx", function (d) { return manhattan_x(d.chr +"; " +d.pos); } )
+          .attr("cy", function (d) { return manhattan_y(-Math.log10(d.pvalue)); } )
           .attr("r", 5)
-          .style("fill", d=> manhattan_color(d.pvalue))
+          .style("fill", d=> manhattan_color(-Math.log10(d.pvalue)))
       .on("mouseover", manhattan_tooltip)
       //.on("mousemove", manhattan_mousemove)
       //.on("mousedown", manhattan_mouseclick)
       .on("mousedown", manhattan_mousemove);
-    
+        
+    // draw Bonferroni line
+    const l1 = d3.line()([ [0, manhattan_y(-Math.log10(manhattan_thresh))], [width, manhattan_y(-Math.log10(manhattan_thresh))] ]);
+    manhattan_svg.append("path")
+                  .attr("id", "bonfLine")
+                  .attr("d",l1)
+                  .attr("stroke", "red")
+                  .attr("stroke-width", 1)
+    // Add bonfLabel to graph
+    manhattan_svg.append("text")
+      .attr("id", "bonfLabel")
+      .attr("x", width-25)
+      .attr("y", manhattan_y(-Math.log10(manhattan_thresh))-12.5)
+      .attr("text-anchor", "left")
+      .attr("class", "h5")
+      .text("Bonferroni");
+
     // Add title to graph
     manhattan_svg.append("text")
       .attr("id", "title")
       .attr("x", 0)
       .attr("y", -50)
       .attr("text-anchor", "left")
-      //.style("font-size", "22px")
       .attr("class", "h5")
       .text(make_manhattan_msg(xs, ys, SNP));
   }
-  function make_manhattan_x(sdata, SNP=null) {
-    if (SNP==null) {
-      /*
-      manhattan_x = d3.scaleLinear()
-                      .range([ 0, width ])
-                      .domain([SNP_info_data[0].pos, SNP_info_data[SNP_info_data.length-1].pos]);
-                      */
-      
-      var csv_x_chr = d3.map(sdata, function(d){return d.chr; });  // map field values
-      manhattan_x = d3.scaleBand()
-                      .range([ 0, width ])
-                      .domain(d3.union(csv_x_chr));
-    } else {
-      let sdata_pos = d3.map(sdata, function(d){return d.pos; });
-      let min_pos = d3.min(sdata_pos);
-      let max_pos = d3.max(sdata_pos);
-      manhattan_x = d3.scaleLinear()
-                      .range([ 0, width ])
-                      .domain([min_pos, max_pos]);
-    }
+  function make_manhattan_x(sdata, SNP=null) {    
+    let width = SNP==null? manhattan_full_width:manhattan_zoom_width;
+    // assume sorted by chr and position
+    var csv_x_chr = d3.map(sdata, function(d){return d.chr +"; " +d.pos; });  // map field values
+    manhattan_x = d3.scaleBand()
+                    .range([ 0, width ])
+                    .domain(d3.union(csv_x_chr));
     return manhattan_x;
   }
   function make_manhattan_y(sdata, SNP=null) {
     const sdata_pvalues = d3.map(sdata, function(d){return d.pvalue; })
-    const max_pval = d3.max(sdata_pvalues)*100; 
+    let max_pval = d3.max(sdata_pvalues);   // focus is not on max 
     let min_pval = d3.min(sdata_pvalues); 
-    min_pval = min_pval==0 ? Number.MIN_VALUE:min_pval/10;
+    min_pval = min_pval==0 ? Number.MIN_VALUE:min_pval/10;  // add padding for min 
+    /*
     manhattan_y = d3.scaleLog()
                     .range([ height, 0 ])
                     .domain([max_pval, min_pval])
+                    */
+    
+    manhattan_y = d3.scaleLinear()
+                    .range([ height, 0 ])
+                    .domain([-Math.log10(max_pval), -Math.log10(min_pval)]);
     return manhattan_y;
   }
   function make_manhattan_xAxis(sdata, manhattan_x, SNP=null) {
     /*
-    var sdata_sorted = sdata.sort((a,b) => (a.chr-b.chr || a.pos -b.pos));  // sort by chromosome then position
+    var myAxis = d3.axisBottom()
+                   .scale(manhattan_x);
+                   */
+    // var sdata_sorted = sdata.sort((a,b) => (a.chr>b.chr || a.pos -b.pos));  // sort by chromosome then position
+    var sdata_sorted = sdata; // already sorted
 
     var num_loc_data = sdata.length;
-    var num_ticks = 5;
+    var num_ticks = SNP==null? 23:(5 +1);
     var tickPoints = [];
     var ticks = [];  // use 4 positions mostly linearly spaced; can be locus coords in future
-    if (num_ticks>num_loc_data) {
-      tickPoints = sdata_sorted;
-      ticks = d3.map(sdata_sorted, d=> d.pos);
+    
+    if (SNP==null) {
+      var prevChr = 0;
+      for (let i=0; i<sdata_sorted.length; i++) { // push first point
+        let cur_point = sdata_sorted[i];
+        if (cur_point.chr!=prevChr) {
+          prevChr = cur_point.chr;
+          tickPoints.push(SNP==null? cur_point.chr:cur_point.pos);
+          ticks.push(cur_point.chr +"; " +cur_point.pos);
+        }
+      }
     } else {
-      for (let i=0; i<num_ticks; i++) {
-        let cur_point = sdata_sorted[Math.floor((i/num_ticks)*num_loc_data)];
-        tickPoints.push(cur_point);
-        ticks.push(cur_point.pos);
+      if (num_ticks>num_loc_data) {
+        tickPoints = d3.map(sdata_sorted, d=> d.pos);
+        ticks = d3.map(sdata_sorted, d=> d.chr +"; " +d.pos);
+      } else {
+        var chr_pos = d3.map(sdata_sorted, d=> d.pos);
+        for (let i=0; i<num_ticks; i++) {
+          let qIndex = d3.quantileIndex(chr_pos, i*1/(num_ticks-1));  // dont want interpolation
+          tickPoints.push( d3.format(".2e")(sdata_sorted[qIndex].pos) );
+          ticks.push(cur_chr +"; " +sdata_sorted[qIndex].pos);
+        }
       }
     }
     var myAxis = d3.axisBottom()
                    .scale(manhattan_x)
                    .tickValues(ticks)
-                   .tickFormat(function(d,i){ return tickPoints[i].chr +";" +tickPoints[i].pos });
+                   .tickFormat(function(d,i){ return tickPoints[i] });
     return myAxis;
-    */
-    return manhattan_x;
   }
 
   async function change_manhattan(xs, ys, SNP=null) {
     console.log("in change_manhattan; xs:" +xs, "; ys:" +ys);
-    
+    let width = SNP==null? manhattan_full_width:manhattan_zoom_width;
+
     // get new location data
-    cur_xs = xs;
-    cur_ys = ys;
-    //await get_loc_data();
-    loading_ui();
-    await get_loc_data_bin();
-    loaded_ui();
+    if (cur_xs!=xs || cur_ys!=ys) {
+      cur_xs = xs;
+      cur_ys = ys;
+      loading_ui();
+      await get_loc_data_bin();
+      loaded_ui();
+    }
     var sdata = loc_data;
     
     var target_suffix = SNP==null ? "full":"zoom";
-    var manhattan_svg = manhattan_svgs[target_suffix];
+    var manhattan_svg = manhattan_svgs[target_suffix]; 
     if (SNP!=null) {
       let cur_SNP_info = SNP_info_dict[SNP];
-      sdata = d3.filter(loc_data, d => { return Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
+      sdata = d3.filter(sdata, d => { return d.chr==cur_SNP_info.chr && Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
+      highlight_SNP(manhattan_svgs["zoom"], "zoom", SNP);
+    } else {
+      sdata = d3.filter(sdata, d => { return d.sentinel==1; });
+
+      // max sentinel SNP for this location
+      let sdata_pvals = d3.map(sdata, d=> d.pvalue);
+      let min_pval = d3.min(sdata_pvals);
+      let cur_SNP_info = d3.filter(sdata, d=> {return d.pvalue==min_pval} )[0];
+      prev_SNP = cur_SNP;      
+      cur_SNP = cur_SNP_info.SNP;
+      cur_chr = SNP_info_dict[cur_SNP]["chr"];
+      highlight_SNP(manhattan_svgs["full"], "full", cur_SNP);
+      
+      change_manhattan(xs, ys, cur_SNP); // zoom on representative SNP 
     }
 
-    //manhattan_x = d3.scaleLinear().range([ 0, width ]).domain([SNP_info_data[0].pos, SNP_info_data[SNP_info_data.length-1].pos]);
     manhattan_x = make_manhattan_x(sdata, SNP);    
-    var myAxis = make_manhattan_xAxis(sdata, manhattan_x);
+    var myAxis = make_manhattan_xAxis(sdata, manhattan_x, SNP);
     manhattan_svg.select("g#xaxis")
                  .call(myAxis)
                  .attr("transform",`translate(${0}, ${height})`);
 
     manhattan_y = make_manhattan_y(sdata, SNP);
     manhattan_svg.select("g#yaxis")
-                 .call(d3.axisLeft(manhattan_y).ticks(3).tickFormat(d3.format(".0e")));
-    manhattan_svg.append("text")
-                 .attr("text-anchor", "end")
-                 .attr("transform", "rotate(-90)")
-                 .attr("y", -margin.left+10)
-                 .attr("x", -margin.top+85)
-                 .text("p-value")
+                 //.call(d3.axisLeft(manhattan_y).ticks(3).tickFormat(d3.format(".0e")));
+                 .call(d3.axisLeft(manhattan_y));
 
-    manhattan_svg.selectAll("#title")
-                 .text(make_manhattan_msg(xs, ys, SNP));
-
-    // redraw
+    // redraw - join only changes existing points and breaks if more than before
+    /*
     manhattan_svg.selectAll("circle")
                   .data(sdata)
                   .join()
-                    .attr("cx", function (d) { return manhattan_x(d.pos); } )
-                    .attr("cy", function (d) { return manhattan_y(d.pvalue); } )
+                    .attr("cx", function (d) { return manhattan_x(d.chr +"; " +d.pos); } )
+                    .attr("cy", function (d) { return manhattan_y(-Math.log10(d.pvalue)); } )
                     .attr("r", 5)
-                 .style("fill", d=> manhattan_color(d.pvalue));
+                 .style("fill", d=> manhattan_color(-Math.log10(d.pvalue)));
+    */
+    manhattan_svg.selectAll("circle").remove()
+    manhattan_svg.append('g')
+        .selectAll("dot")
+        .data(sdata)
+        .enter()
+        .append("circle")
+          .attr("SNP", d=> d.SNP)
+          .attr("cx", function (d) { return manhattan_x(d.chr +"; " +d.pos); } )
+          .attr("cy", function (d) { return manhattan_y(-Math.log10(d.pvalue)); } )
+          .attr("r", 5)
+          .style("fill", d=> manhattan_color(-Math.log10(d.pvalue)))
+      .on("mouseover", manhattan_tooltip)
+      //.on("mousemove", manhattan_mousemove)
+      //.on("mousedown", manhattan_mouseclick)
+      .on("mousedown", manhattan_mousemove);
+    
+    // draw Bonferroni line
+    const l1 = d3.line()([ [0, manhattan_y(-Math.log10(manhattan_thresh))], [width, manhattan_y(-Math.log10(manhattan_thresh))] ]);
+    manhattan_svg.selectAll("#bonfLine")
+                 .join()
+                    .attr("d",l1)
+                    .attr("stroke", "red")
+                    .attr("stroke-width", 1)
+    // Add bonfLabel to graph
+    manhattan_svg.selectAll("#bonfLabel")
+                 .join()
+                    .attr("x", width-25)
+                    .attr("y", manhattan_y(-Math.log10(manhattan_thresh))-12.5)
+                    .attr("text-anchor", "left")
+                    .attr("class", "h5")
+                    .text("Bonferroni");
 
+    manhattan_svg.selectAll("#title")
+                .text(make_manhattan_msg(xs, ys, SNP));
+    /*
     manhattan_svg.selectAll(".scattertext")
                   .data(sdata)
                   .join()
-                    .attr("x", function (d) { return manhattan_x(d.pos) + 5; } )
-                    .attr("y", function (d) { return manhattan_y(d.pvalue) - 5; } )
-                    .attr("transform", d => "rotate(-45 " + manhattan_x(d.pos) + " " + manhattan_y(d.pvalue) + " ) ")
-                    //.text(label_SNPs)
+                    .attr("x", function (d) { return manhattan_x(d.chr +"; " +d.pos) + 5; } )
+                    .attr("y", function (d) { return manhattan_y(-Math.log10(d.pvalue)) - 5; } )
+                    .attr("transform", d => "rotate(-45 " + manhattan_x(d.chr +"; " +d.pos) + " " + manhattan_y(d.pvalue) + " ) ")
+                    .text(label_SNPs)
+                    */
 	}
   
   function label_SNPs(d) {
@@ -1096,18 +1155,18 @@ var freeze_mac = false;
     return msg;
   }
   function make_manhattan_msg(xs, ys, SNP) {
-    cur_xs = xs;
-    cur_ys = ys;
-    let msg = SNP!=null ? "Focused ":"";
-    msg += "Manhattan for grid location: " +xs +", " +ys;
+    let msg = ""; 
+    if (SNP!=null) {
+      msg = "Zoomed Manhattan for " +cur_SNP +" on chr" +cur_chr;
+    } else {
+      msg = "Manhattan of sentinel SNPs for grid location: " +xs +", " +ys;
+    }
     if (freeze_manhattan) {
       msg += " (Locked - click a heatmap to unlock)";
     }
     return msg;
   }
   function make_bar_msg(xs, ys) {
-    cur_xs = xs;
-    cur_ys = ys;
     let msg = "Bar for grid location: " +xs +", " +ys;
     if (freeze_manhattan) {
       msg += " (Locked - click a heatmap to unlock)";
@@ -1153,10 +1212,15 @@ function filterSNPs() {
       td = document.createElement("td");
       td.innerHTML = d3.format(".2%")(filtered_SNPs[i].num_sig/NUM_GRID_POINTS);
       tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_SNPs[i].num_sig > 0 ? "Yes":"Not available as not significant";
+      tr.appendChild(td);
       
-      let tr_event = document.createAttribute("onclick");
-      tr_event.value = "on_SNP_click('" +filtered_SNPs[i].SNP +"')";
-      tr.setAttributeNode(tr_event);
+      if (filtered_SNPs[i].num_sig > 0) {
+        let tr_event = document.createAttribute("onclick");
+        tr_event.value = "on_SNP_click('" +filtered_SNPs[i].SNP +"')";
+        tr.setAttributeNode(tr_event);
+      }
       tbody_new.appendChild(tr);
     }    
     tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
