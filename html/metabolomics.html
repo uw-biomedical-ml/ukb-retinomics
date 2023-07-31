@@ -130,7 +130,7 @@ var margin = {top: 75, right: 70, bottom: 30, left:35},
 console.log(width +";" +height);
 var colorbar_width = margin.left+10+25;
 var heatmap_bar_width =10;
-var bar_width = (width + margin.left + margin.right)*1.8;
+var bar_width = width*2;
 
 var info_dict = {};
 var info_array = [];
@@ -157,10 +157,10 @@ var cur_xs = 128;
 var cur_ys = 64;
 var cur_met = "Total_C";
 
-var vol_x;
 var max_pval = 1;
 //var MIN_PVALUE = Number.MIN_VALUE;
-var MIN_PVALUE = 1e-10;              
+var MIN_PVALUE = 1e-10;
+var vol_x;
 var vol_y;  // now updated in render_volcano and change_volcano
 var vol_color;
 var vol_s_min;
@@ -169,6 +169,8 @@ var vol_s_max;
 var freeze_vol = false;
 var freeze_mac = false;
 
+var bar_x;
+var bar_y;
 var bar_tooltip;
 var bar_mousemove;
 var bar_mouseclick;
@@ -522,6 +524,21 @@ var bar_thresh = 0.05;
     let cur_elem = target_svg.selectAll("rect[x='" +mac_xfunc(new_xs) +"'][y='" + mac_yfunc(new_ys) +"']");
     cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
   }
+  function highlight_metabolite(target_svg, svg_name, new_met) {
+    console.log("in highlight_metabolite: ", svg_name +"; met:" +new_met);
+    
+    if (svg_name=="bar") {
+      let prev_elem = target_svg.selectAll("rect[metabolite='" +cur_met +"']");
+      prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+      let cur_elem = target_svg.selectAll("rect[metabolite='" +new_met +"']");
+      cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+    } else if (svg_name=="volcano") {
+      let prev_elem = target_svg.selectAll("circle[metabolite='" +cur_met +"']");
+      prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+      let cur_elem = target_svg.selectAll("circle[metabolite='" +new_met +"']");
+      cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+    }
+  }
   function label_metabolites(d) {
     console.log("in label_metabolites: " + d);
     if (d.pvalue<0.05) { 
@@ -594,8 +611,13 @@ var bar_thresh = 0.05;
               .text("inferior");
 
     // Build color scale
+    /*
     const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
+    */
+    let field_vals = d3.map(sdata, d=>d[fieldName])
+    const cmin = d3.min(field_vals);
+    const cmax = d3.max(field_vals);
     var mac_color = make_mac_color(fieldName, cmin, cmax);
     
     heatmap_bar_width = mac_xfunc.bandwidth();
@@ -609,9 +631,9 @@ var bar_thresh = 0.05;
       if (! freeze_vol) {
         highlight_coord(heatmap_svgs["beta"], d.x, d.y);
         highlight_coord(heatmap_svgs["pvalue"], d.x, d.y);    
-        highlight_coord(heatmap_svgs["meanThick"], d.x, d.y);    
+        highlight_coord(heatmap_svgs["meanThick"], d.x, d.y);
         // update to show on macula heatmaps
-        change_volcano(d.x, d.y); 
+        change_volcano(d.x, d.y);   // can await before change_bar to save a file load - but forces things sync
         change_bar(d.x, d.y);
       }
     }
@@ -671,25 +693,32 @@ var bar_thresh = 0.05;
 
     // get new snip data
     if (fieldName!="meanThick") { // only highlight new coord if meanThick
-      cur_met = met;
       updateStatus = true;
-      loading_ui();
-      await get_met_data_bin(); // using compressed files      
-      loaded_ui();
+      if (met!=cur_met) {
+        cur_met = met;
+        loading_ui();
+        await get_met_data_bin(); // using compressed files      
+        loaded_ui();
+      }
       let sdata = met_data;
 
       // Build color scale
+      /*
       const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
       const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
+      */
+      let field_vals = d3.map(sdata, d=>d[fieldName]);
+      const cmin = d3.min(field_vals);
+      const cmax = d3.max(field_vals);
       var mac_color = make_mac_color(fieldName, cmin, cmax);
 
       target_svg.selectAll("rect")
           .data(sdata)
           .join()
-          .style("fill", d=> mac_color(d[fieldName]))
+          .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
           .style("fill-opacity", function(d) { return 1- d.pvalue} )
           .style("stroke-width", 0)
-          .style("stroke", function(d) { return mac_color(d[fieldName]) })
+          .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
 
       render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, heatmap_bar_width);
     }
@@ -723,10 +752,12 @@ var bar_thresh = 0.05;
 
     var vol_mousemove = function(e, d) {
       console.log("in vol_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+      highlight_metabolite(bar_svg, "bar", d.metabolite);
+      highlight_metabolite(volcano_svg, "volcano", d.metabolite);
 
       freeze_vol = false;
       if (! freeze_mac) { 
-        change_macula(d.metabolite, "beta"); 
+        change_macula(d.metabolite, "beta"); // can await before 2nd change_macula to save a file load - but forces things sync
         change_macula(d.metabolite, "pvalue"); 
       }
     }
@@ -761,18 +792,28 @@ var bar_thresh = 0.05;
          .style("color", "lime")
          .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
-    // Build Y scales and axis:
-    vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
-    vol_s_max = d3.max(d3.map(loc_data, d=>d.beta));
-    vol_p_min = d3.min(d3.map(loc_data, d=>d.pvalue));
+    // Get axis domains:
+    let loc_beta = d3.map(loc_data, d=>d.beta);
+    vol_s_min = d3.min(loc_beta);
+    vol_s_max = d3.max(loc_beta);
+    let loc_pval = d3.map(loc_data, d=>d.pvalue);
+    /*
+    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
+    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
+    */
+    const cmin = d3.min(loc_pval);
+    const cmax = d3.max(loc_pval);
+    console.log("cmin:" +cmin)
+    console.log("cmax:" +cmax)
 
+    // Build scales and axis:
     vol_x = d3.scaleLinear()
               .range([ 0, width ])
               .domain([vol_s_min, vol_s_max])
 
     vol_y = d3.scaleLinear()
               .range([ height, 0 ])
-              .domain([-Math.log10(max_pval), -Math.log10(vol_p_min)]);
+              .domain([-Math.log10(max_pval), -Math.log10(cmin)]);
           
     volcano_svg.append("g")
               .attr("id", "xaxis")
@@ -783,10 +824,6 @@ var bar_thresh = 0.05;
               .call(d3.axisLeft(vol_y));
 
     // Build color scale
-    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
-    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
-    console.log("cmin:" +cmin)
-    console.log("cmax:" +cmax)
     // 1 color shade and different heatmap colors!
     var vol_color = d3.scaleSequential()
                       .interpolator(d3.interpolateBlues)
@@ -813,6 +850,7 @@ var bar_thresh = 0.05;
                 .data(sdata)
                 .enter()
                 .append("circle")
+                  .attr("metabolite", d=> d.metabolite)
                   .attr("cx", function (d) { return vol_x(d.beta); } )
                   .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                   .attr("r", 5)
@@ -839,13 +877,13 @@ var bar_thresh = 0.05;
     //const sdata = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < max_pval});
     // get new location data
     if (cur_xs!=xs || cur_ys!=ys) {
+      cur_xs=xs;
+      cur_ys=ys;
       updateStatus =true;
       loading_ui();
       await get_loc_data_bin();
       loaded_ui();
     }
-    cur_xs=xs;
-    cur_ys=ys;
     var sdata = loc_data;
 
     vol_s_min = d3.min(d3.map(loc_data, d=>d.beta));
@@ -860,8 +898,12 @@ var bar_thresh = 0.05;
               .domain([-Math.log10(max_pval), -Math.log10(vol_p_min)]);
 
     // Build color scale
+    /*
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
+    */
+    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0);
+    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 1);
     console.log("cmin:" +cmin)
     console.log("cmax:" +cmax)
     vol_color = d3.scaleSequential()
@@ -887,6 +929,7 @@ var bar_thresh = 0.05;
     volcano_svg.selectAll("circle")
                .data(sdata)
                .join()
+                .attr("metabolite", d=> d.metabolite)
                 .attr("cx", function (d) { return vol_x(d.beta); } )
                 .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
                 .attr("r", 5)
@@ -899,8 +942,8 @@ var bar_thresh = 0.05;
     // append the svg object to the body of the page
     bar_svg = d3.select("#horizontal_bar")
                 .append("svg")
-                .attr("width", bar_width)
-                .attr("height", height + margin.top + margin.bottom)
+                .attr("width", bar_width +margin.left +margin.right)
+                .attr("height", height +margin.top +margin.bottom)
                 .append("g")
                 .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
   
@@ -927,9 +970,9 @@ var bar_thresh = 0.05;
             .attr("transform", "rotate(-90,-22.5," +height/2 +")");
 
     // Add Y axis - same as volcano X axis
-    let bar_y = d3.scaleLinear()
-                  .range([ 0, height])
-                  .domain([vol_s_max, vol_s_min])
+    bar_y = d3.scaleLinear()
+              .range([ 0, height])
+              .domain([vol_s_max, vol_s_min])
 
     bar_svg.append("g")
           .attr("id", "yaxis")
@@ -939,9 +982,9 @@ var bar_thresh = 0.05;
           .style("text-anchor", "end");
 
     // X axis
-    var bar_x = d3.scaleBand()
-                  .range([ 0, bar_width])
-                  .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
+    bar_x = d3.scaleBand()
+              .range([ 0, bar_width])
+              .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
               //.padding(.1);
     
     bar_svg.append("g")
@@ -957,17 +1000,21 @@ var bar_thresh = 0.05;
 ;
        
     // Build color scale
-    const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
-    const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
+    //const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
+    //const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
+    const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0);
+    const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 1);
     var mac_color = make_mac_color(fieldName, cmin, cmax);
 
     // event handlers
     bar_mousemove = function(e, d) {
       console.log("in bar_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+      highlight_metabolite(bar_svg, "bar", d.metabolite);
+      highlight_metabolite(volcano_svg, "volcano", d.metabolite);
 
       freeze_vol = false;
       if (! freeze_mac) { 
-        change_macula(d.metabolite, "beta"); 
+        change_macula(d.metabolite, "beta");  // can await before 2nd change_macula to save a file load - but forces things sync
         change_macula(d.metabolite, "pvalue"); 
       }
     }
@@ -997,7 +1044,7 @@ var bar_thresh = 0.05;
          //.style("left", (d3.mouse(this)[0] +10) +"px")
          //.style("top", (d3.mouse(this)[1] +10) +"px")
          .style("left", (e.pageX +10) +"px")
-         .style("top", (e.pageY +10) +"px")         
+         .style("top", (e.pageY +10) +"px")
          .style("color", "lime")
          .html(info_dict[d.metabolite]["desc"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
     }
@@ -1006,6 +1053,7 @@ var bar_thresh = 0.05;
             .data(data_filtered_sorted)
             .enter()
             .append("rect")
+            .attr("metabolite", d=> d.metabolite)
             .attr("x", function(d) { return bar_x(d.metabolite); })
             .attr("width", bar_x.bandwidth() )
             .attr("y", function(d) { 
@@ -1032,14 +1080,14 @@ var bar_thresh = 0.05;
   async function change_bar(xs, ys) {
     console.log("in change_bar; xs:" +xs, "; ys:" +ys);
     
-    if (cur_xs!=xs || cur_ys!=yes) {
+    if (cur_xs!=xs || cur_ys!=ys) {
+      cur_xs = xs;
+      cur_ys = ys;
       updateStatus = true;
       loading_ui();
       await get_loc_data_bin();
       loaded_ui();
     }
-    cur_xs = xs;
-    cur_ys = ys;
     var sdata = loc_data;
 
     // change title
@@ -1052,14 +1100,14 @@ var bar_thresh = 0.05;
     let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
 
     // Add Y axis - same as volcano X axis
-    let bar_y = d3.scaleLinear()
-                  .range([ 0, height])
-                  .domain([vol_s_max, vol_s_min])
+    bar_y = d3.scaleLinear()
+              .range([ 0, height])
+              .domain([vol_s_max, vol_s_min])
 
     // X axis
-    var bar_x = d3.scaleBand()
-                  .range([ 0, bar_width])
-                  .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
+    bar_x = d3.scaleBand()
+              .range([ 0, bar_width])
+              .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }))
     
     bar_svg.select("g#yaxis")
                .call(d3.axisLeft(bar_y));    
@@ -1073,8 +1121,10 @@ var bar_thresh = 0.05;
               .attr("transform", "rotate(-65)" )
        
     // Build color scale
-    const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
-    const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
+    //const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
+    //const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
+    const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0);
+    const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 1);
     var mac_color = make_mac_color(fieldName, cmin, cmax);
     
     // remove everything and then add - something weird about d3.join() for bar charts!?
@@ -1083,6 +1133,7 @@ var bar_thresh = 0.05;
             .data(data_filtered_sorted)
             .enter()
             .append("rect")
+            .attr("metabolite", d=> d.metabolite)
             .attr("x", function(d) { return bar_x(d.metabolite); })
             .attr("width", bar_x.bandwidth() )
             .attr("y", function(d) { 
@@ -1130,8 +1181,6 @@ var bar_thresh = 0.05;
     return msg;
   }
   function make_volcano_msg(xs, ys) {
-    cur_xs = xs;
-    cur_ys = ys;
     let msg = "Volcano for grid location: " +xs +", " +ys;
     if (freeze_vol) {
       msg += " (Locked - click a heatmap to unlock)";
@@ -1139,8 +1188,6 @@ var bar_thresh = 0.05;
     return msg;
   }
   function make_bar_msg(xs, ys) {
-    cur_xs = xs;
-    cur_ys = ys;
     let msg = "Bar of significant metabolites for grid location: " +xs +", " +ys;
     if (freeze_vol) {
       msg += " (Locked - click a heatmap to unlock)";
@@ -1160,7 +1207,7 @@ function filterBiomarkers() {
   tbody_old = table.tBodies[0];
   tbody_new = document.createElement("tbody");
 
-  var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.indexOf(filter) > -1 || d.desc.indexOf(filter) > -1 });
+  var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.toLowerCase().indexOf(filter) > -1 || d.desc.toLowerCase().indexOf(filter) > -1 });
   table.style.display = "";
   // add biomarker matching search
   if (filtered_biomarkers.length==0) {
