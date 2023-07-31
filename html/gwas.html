@@ -621,7 +621,7 @@ var freeze_mac = false;
   }
 
   function highlight_coord(target_svg, new_xs, new_ys) {
-    console.log("in highlight_coord: ", target_svg +"; xs:" +new_xs +"; ys:" +new_ys);
+    console.log("in highlight_coord: xs:" +new_xs +"; ys:" +new_ys);
 
     let prev_elem = target_svg.selectAll("rect[x='" +mac_xfunc(cur_xs) +"'][y='" + mac_yfunc(cur_ys) +"']");
     prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
@@ -700,8 +700,13 @@ var freeze_mac = false;
               .text("inferior");
 
     // Build color scale
+    /*
     const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
+    */
+    let field_vals = d3.map(sdata, d=>d[fieldName]);
+    let cmin = d3.min(field_vals);
+    let cmax = d3.max(field_vals);
     var mac_color = make_mac_color(fieldName, cmin, cmax);
     
     heatmap_bar_width = mac_xfunc.bandwidth();
@@ -788,8 +793,12 @@ var freeze_mac = false;
       let sdata = SNP_data;
 
       // Build color scale
+      /*
       const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
       const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
+      */
+      let cmin = d3.min(field_vals);
+      let cmax = d3.max(field_vals);
       var mac_color = make_mac_color(fieldName, cmin, cmax);
 
       target_svg.selectAll("rect")
@@ -898,8 +907,13 @@ var freeze_mac = false;
                  .call(d3.axisLeft(manhattan_y));
     
     // Build color scale
+    /*
     const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
     const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
+    */
+    let sdata_pvals = d3.map(sdata, d=>d.pvalue);
+    let cmin = d3.min(sdata_pvals);
+    let cmax = d3.max(sdata_pvals);
     console.log("cmin:" +cmin)
     console.log("cmax:" +cmax)
     // 1 color shade and different heatmap colors!
@@ -1039,7 +1053,6 @@ var freeze_mac = false;
     if (SNP!=null) {
       let cur_SNP_info = SNP_info_dict[SNP];
       sdata = d3.filter(sdata, d => { return d.chr==cur_SNP_info.chr && Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
-      highlight_SNP(manhattan_svgs["zoom"], "zoom", SNP);
     } else {
       sdata = d3.filter(sdata, d => { return d.sentinel==1; });
 
@@ -1050,7 +1063,6 @@ var freeze_mac = false;
       prev_SNP = cur_SNP;      
       cur_SNP = cur_SNP_info.SNP;
       cur_chr = SNP_info_dict[cur_SNP]["chr"];
-      highlight_SNP(manhattan_svgs["full"], "full", cur_SNP);
       
       change_manhattan(xs, ys, cur_SNP); // zoom on representative SNP 
     }
@@ -1110,6 +1122,9 @@ var freeze_mac = false;
 
     manhattan_svg.selectAll("#title")
                 .text(make_manhattan_msg(xs, ys, SNP));
+    
+    
+    highlight_SNP(manhattan_svg, SNP!=null ? "zoom":"full", SNP!=null ? SNP:cur_SNP);
     /*
     manhattan_svg.selectAll(".scattertext")
                   .data(sdata)
@@ -1186,7 +1201,7 @@ function filterSNPs() {
   tbody_old = table.tBodies[0];
   tbody_new = document.createElement("tbody");
   
-  var filtered_SNPs = d3.filter(SNP_info_data, d => { return d.SNP.indexOf(filter) > -1 });
+  var filtered_SNPs = d3.filter(SNP_info_data, d => { return d.SNP.toLowerCase().indexOf(filter) > -1 });
   table.style.display = "";
   // add SNPs matching search
   if (filtered_SNPs.length==0) {
