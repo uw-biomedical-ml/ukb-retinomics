@@ -89,8 +89,14 @@
     </button>
     
     <div class="form-group col-10">
-     <!--<label for="myInput" class="col-sm-2 col-form-label">Search for SNPs</label> -->
-      <input type="text" id="myInput" onkeyup="filterSNPs()" placeholder="Search for SNPs...">
+       <!--<label for="myInput" class="col-sm-2 col-form-label">Search for SNPs</label> -->
+      <input type="text" id="myInput" onkeyup="filterSNPs()" onkeydown="loadSNP(this)" placeholder="Search for SNPs...">      
+      <!--
+      <div class="alert alert-error collapse" role="alert" id="noBiomarker" style="display:none">
+        The biomarker <i id="noBiomarkerName"> </i>
+        does not match any studied.
+      </div>
+      -->
     </div>
 
     <table id="myTable" style="display:none";>
@@ -594,19 +600,26 @@ var freeze_mac = false;
     if (fieldName=="pvalue") {
       // log scale colors - https://gist.github.com/RobinL/6b27f9abc591002779d294f1fdff6b72
       mac_color = d3.scaleSequential()
-                    //.interpolator(d3.interpolateGreys)
-                    .interpolator(d3.interpolateCividis)
+                    //.interpolator(d3.interpolateCividis)
+                    .interpolator(d3.interpolateBlues)
                     .domain([-Math.log10(cmax), -Math.log10(cmin)]);
     } else if (fieldName=="meanThick") {
       mac_color = d3.scaleSequential()
                     //.interpolator(d3.interpolateBlues)
                     .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
-    } else {
+    } else {      
+      mac_color = d3.scaleLinear()
+                    .domain([cmax, 0, cmin])
+                    .range([d3.interpolateRdBu(1), d3.interpolateRdBu(0.5), d3.interpolateRdBu(0)]) ;
+      /*
       if (cmin<0 && cmax>0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateRdBu)
-                      .domain([cmax, cmin]);
+                      .domain([cmax, 0, cmin]);
+        mac_color = d3.scaleLinear()
+                      .domain([cmax, 0, cmin])
+                      .range(["red", "white", "blue"]) ;
       } else if (cmin<0 && cmax<0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateBlues)
@@ -614,8 +627,9 @@ var freeze_mac = false;
       } else if (cmin>0 && cmax>0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateReds)
-                      .domain([cmin, cmax]);
+                      .domain([cmin, cmax]);        
       }
+      */
     }
     return mac_color;
   }
@@ -797,6 +811,7 @@ var freeze_mac = false;
       const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
       const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
       */
+      let field_vals = d3.map(sdata, d=>d[fieldName]);
       let cmin = d3.min(field_vals);
       let cmax = d3.max(field_vals);
       var mac_color = make_mac_color(fieldName, cmin, cmax);
@@ -849,15 +864,14 @@ var freeze_mac = false;
 
     manhattan_mousemove = function(e, d) {
       console.log("in manhattan_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
-      // prev_SNP = cur_SNP;
-      // highlight_SNP(manhattan_svgs["full"], "full", d.SNP);
 
       freeze_manhattan = false;
       if (! freeze_mac) { 
         change_macula(d.SNP, "beta"); 
         change_macula(d.SNP, "pvalue"); 
-        change_manhattan(xs, ys, d.SNP);
-        // highlight_SNP(manhattan_svgs["zoom"], "zoom", d.SNP);
+
+        highlight_SNP(manhattan_svgs["full"], "full", d.SNP); // full version not re-rendered so need to highlight separately
+        change_manhattan(xs, ys, d.SNP);  // only change zoomed version
       }
     }
     manhattan_mouseclick = function(e, d) {
@@ -965,6 +979,9 @@ var freeze_mac = false;
       .attr("text-anchor", "left")
       .attr("class", "h5")
       .text(make_manhattan_msg(xs, ys, SNP));
+
+    // highlight initial SNPs
+    highlight_SNP(manhattan_svg, SNP==null?"full":"zoom", cur_SNP);
   }
   function make_manhattan_x(sdata, SNP=null) {    
     let width = SNP==null? manhattan_full_width:manhattan_zoom_width;
@@ -989,6 +1006,7 @@ var freeze_mac = false;
     manhattan_y = d3.scaleLinear()
                     .range([ height, 0 ])
                     .domain([-Math.log10(max_pval), -Math.log10(min_pval)]);
+
     return manhattan_y;
   }
   function make_manhattan_xAxis(sdata, manhattan_x, SNP=null) {
@@ -1122,8 +1140,7 @@ var freeze_mac = false;
 
     manhattan_svg.selectAll("#title")
                 .text(make_manhattan_msg(xs, ys, SNP));
-    
-    
+        
     highlight_SNP(manhattan_svg, SNP!=null ? "zoom":"full", SNP!=null ? SNP:cur_SNP);
     /*
     manhattan_svg.selectAll(".scattertext")
@@ -1192,6 +1209,22 @@ var freeze_mac = false;
 render();
 
 // filter function
+function loadSNP(ele) {  
+  if (event.key=="Enter") {
+    let filter = ele.value.toLowerCase();
+    let matching_snps = d3.filter(SNP_info_data, d => { return d.SNP.toLowerCase()==filter });
+
+    if (matching_snps.length >0) {
+      on_SNP_click(matching_snps[0].SNP);
+    } 
+    /*else {
+      document.getElementById("noBiomarker").classList.add("show");
+      document.getElementById("noBiomarkerName").text = ele.value;
+    }*/
+  } else {
+    // do nothing
+  }
+}
 function filterSNPs() {
   // Declare variables
   var input, filter, table, tr, td, i, txtValue, tbody_new, tbody_old;

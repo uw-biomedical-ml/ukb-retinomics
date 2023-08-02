@@ -8,6 +8,14 @@
 <script src="sources/d3.min.js"></script>
 <script src="sources/pako.js"></script>
 
+<style>
+  .table-overflow {
+    overflow-y:scroll;
+    max-height:300px;
+    display:block;
+  }
+</style>
+
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
   <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
     <span class="navbar-toggler-icon"></span>
@@ -58,11 +66,17 @@
     <div class="form-group col-10">
       <!--<label for="myInput" class="col-sm-2 col-form-label">Search for metabolites</label>
       <div class="col-sm-10">-->
-        <input type="text" class="form-control" id="myInput" onkeyup="filterBiomarkers()" placeholder="Search for metabolites">
+        <input type="text" class="form-control" id="myInput" onkeyup="filterBiomarkers()" onkeydown="loadBiomarker(this)" placeholder="Search for metabolites">
       <!--</div>-->
+      <!--
+      <div class="alert alert-error collapse" role="alert" id="noBiomarker" style="display:none">
+        The biomarker <i id="noBiomarkerName"> </i>
+        does not match any studied.
+      </div>
+      -->
     </div>
 
-    <table id="myTable" class="table-striped" style="display:none";>
+    <table id="myTable" class="table-striped table-overflow" style="display:none;">
       <thead>
         <tr class="header thead-dark">
           <th style="width:15%;">Metabolite</th>
@@ -489,19 +503,26 @@ var bar_thresh = 0.05;
     if (fieldName=="pvalue") {
       // log scale colors - https://gist.github.com/RobinL/6b27f9abc591002779d294f1fdff6b72
       mac_color = d3.scaleSequential()
-                    //.interpolator(d3.interpolateGreys)
-                    .interpolator(d3.interpolateCividis)
+                    //.interpolator(d3.interpolateCividis)
+                    .interpolator(d3.interpolateBlues)
                     .domain([-Math.log10(cmax), -Math.log10(cmin)]);
     } else if (fieldName=="meanThick") {
       mac_color = d3.scaleSequential()
                     //.interpolator(d3.interpolateBlues)
                     .interpolator(d3.interpolateViridis)
                     .domain([cmin, cmax]);
-    } else {
+    } else {      
+      mac_color = d3.scaleLinear()
+                    .domain([cmax, 0, cmin])
+                    .range([d3.interpolateRdBu(1), d3.interpolateRdBu(0.5), d3.interpolateRdBu(0)]) ;
+      /*
       if (cmin<0 && cmax>0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateRdBu)
-                      .domain([cmax, cmin]);
+                      .domain([cmax, 0, cmin]);
+        mac_color = d3.scaleLinear()
+                      .domain([cmax, 0, cmin])
+                      .range(["red", "white", "blue"]) ;
       } else if (cmin<0 && cmax<0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateBlues)
@@ -509,9 +530,9 @@ var bar_thresh = 0.05;
       } else if (cmin>0 && cmax>0) {
         mac_color = d3.scaleSequential()
                       .interpolator(d3.interpolateReds)
-                      .domain([cmin, cmax]);
+                      .domain([cmin, cmax]);        
       }
-
+      */
     }
     return mac_color;
   }
@@ -1200,6 +1221,22 @@ var bar_thresh = 0.05;
 render();
 
 // filter function
+function loadBiomarker(ele) {  
+  if (event.key=="Enter") {
+    let filter = ele.value.toLowerCase();
+    let matching_biomarkers = d3.filter(info_array, d => { return d.bmarker.toLowerCase()==filter || d.desc.toLowerCase()==filter });
+
+    if (matching_biomarkers.length >0) {
+      on_biomarker_click(matching_biomarkers[0].bmarker);
+    } 
+    /*else {
+      document.getElementById("noBiomarker").classList.add("show");
+      document.getElementById("noBiomarkerName").text = ele.value;
+    }*/
+  } else {
+    // do nothing
+  }
+}
 function filterBiomarkers() {
   // Declare variables
   var input, filter, table, tr, td, i, txtValue, tbody_new, tbody_old;
@@ -1210,9 +1247,10 @@ function filterBiomarkers() {
   tbody_new = document.createElement("tbody");
 
   var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.toLowerCase().indexOf(filter) > -1 || d.desc.toLowerCase().indexOf(filter) > -1 });
+  var filtered_biomarkers_sorted = filtered_biomarkers.sort((a, b) => -parseInt(a["n_sig_adj.P.Val"]) + parseInt(b["n_sig_adj.P.Val"]) );
   table.style.display = "";
   // add biomarker matching search
-  if (filtered_biomarkers.length==0) {
+  if (filtered_biomarkers_sorted.length==0) {
     tr = document.createElement("tr");
     td = document.createElement("td");
     td.innerHTML = "No matching biomarkers found";
@@ -1224,20 +1262,20 @@ function filterBiomarkers() {
     //table.appendChild(tr);
     tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
   } else {
-    for (let i=0; i<Math.min(filtered_biomarkers.length, 10); i++) {
+    for (let i=0; i<Math.min(filtered_biomarkers_sorted.length, 50); i++) {
       tr = document.createElement("tr");
       td = document.createElement("td");
-      td.innerHTML = filtered_biomarkers[i].bmarker;
+      td.innerHTML = filtered_biomarkers_sorted[i].bmarker;
       tr.appendChild(td);
       td = document.createElement("td");
-      td.innerHTML = filtered_biomarkers[i].desc;
+      td.innerHTML = filtered_biomarkers_sorted[i].desc;
       tr.appendChild(td);
       td = document.createElement("td");
-      td.innerHTML = d3.format(".2%")(filtered_biomarkers[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);
+      td.innerHTML = d3.format(".2%")(filtered_biomarkers_sorted[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);
       tr.appendChild(td);
       
       let tr_event = document.createAttribute("onclick");
-      tr_event.value = "on_biomarker_click('" +filtered_biomarkers[i].bmarker +"')";
+      tr_event.value = "on_biomarker_click('" +filtered_biomarkers_sorted[i].bmarker +"')";
       tr.setAttributeNode(tr_event);
       tbody_new.appendChild(tr);
     }    
