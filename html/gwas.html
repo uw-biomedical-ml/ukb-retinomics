@@ -587,6 +587,7 @@ var freeze_mac = false;
   }
   function extract_macula_heatmap_data(d, mac_color, fieldName) {
     if (fieldName=='pvalue') {
+      console.log(d[fieldName] +";" +";" +-Math.log10(d[fieldName]) +";" +mac_color(-Math.log10(d[fieldName])))
       return mac_color(-Math.log10(d[fieldName]));
     } else {
       return mac_color(d[fieldName]);
@@ -729,6 +730,7 @@ var freeze_mac = false;
     
     var mousemove = function(e, d) {
       console.log("in mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
+      d3.select("#div_tooltip").selectAll(".tooltip").remove();
 
       freeze_mac = false;
       if (! freeze_manhattan) {
@@ -819,10 +821,10 @@ var freeze_mac = false;
       target_svg.selectAll("rect")
           .data(sdata)
           .join()
-          .style("fill", d=> mac_color(d[fieldName]))
+          .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
           .style("fill-opacity", function(d) { return 1- d.pvalue} )
           .style("stroke-width", 0)
-          .style("stroke", function(d) { return mac_color(d[fieldName]) })
+          .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
 
       render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, heatmap_bar_width);
     }
@@ -842,7 +844,8 @@ var freeze_mac = false;
       let cur_SNP_info = SNP_info_dict[SNP];
       sdata = d3.filter(loc_data, d => { return d.chr==cur_SNP_info.chr && Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
     } else {
-      sdata = d3.filter(loc_data, d => { return d.sentinel==1; });
+      // sdata = d3.filter(loc_data, d => { return d.sentinel==1; });
+      sdata = d3.filter(loc_data, d => { return (d.sentinel==1) || (d.pvalue < manhattan_thresh) });
     }
 
     var csv_x = d3.map(sdata, function(d){return d.chr;})
@@ -864,6 +867,7 @@ var freeze_mac = false;
 
     manhattan_mousemove = function(e, d) {
       console.log("in manhattan_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
+      d3.select("#div_tooltip").selectAll(".tooltip").remove();
 
       freeze_manhattan = false;
       if (! freeze_mac) { 
@@ -1072,7 +1076,7 @@ var freeze_mac = false;
       let cur_SNP_info = SNP_info_dict[SNP];
       sdata = d3.filter(sdata, d => { return d.chr==cur_SNP_info.chr && Math.abs(d.pos - cur_SNP_info.pos) < 500000 });
     } else {
-      sdata = d3.filter(sdata, d => { return d.sentinel==1; });
+      sdata = d3.filter(sdata, d => { return (d.sentinel==1) || (d.pvalue < manhattan_thresh)  });
 
       // max sentinel SNP for this location
       let sdata_pvals = d3.map(sdata, d=> d.pvalue);
@@ -1191,7 +1195,7 @@ var freeze_mac = false;
     if (SNP!=null) {
       msg = "Zoomed Manhattan for " +cur_SNP +" on chr" +cur_chr;
     } else {
-      msg = "Manhattan of sentinel SNPs for grid location: " +xs +", " +ys;
+      msg = "Manhattan of sentinel and significant SNPs for grid location: " +xs +", " +ys;
     }
     if (freeze_manhattan) {
       msg += " (Locked - click a heatmap to unlock)";
