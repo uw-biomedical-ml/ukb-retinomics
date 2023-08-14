@@ -365,7 +365,8 @@ var freeze_mac = false;
           console.log("get_info_data_all_bin; after decode: " +data_str.length);
 
           let SNP_info_data_all = d3.csvParse(data_str, function(d) {
-            return { "SNP": d.SNP, "chr":d.chr, "num_sig":0, "bonf":0};
+            // return { "SNP": d.SNP, "chr":d.chr, "num_sig":0, "bonf":0};
+            return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "num_sig":0, "bonf":0};
           });
 
           SNP_info_data = SNP_info_data.concat(SNP_info_data_all);
@@ -1305,9 +1306,4 @@ async function on_SNP_click(SNP) {
   
   // repaint heatmaps
   await change_macula(SNP, "beta");
-  change_macula(SNP, "pvalue");
-}
-</script>
-
-</body>
-</html>
+  change_macula(SNP
