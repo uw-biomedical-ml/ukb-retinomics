@@ -121,22 +121,6 @@ def make_combined_SNPs_info_file():
     # fin.close()
     # locSNPIDs_set = set(locSNPIDs)  # NB - non-unique by just rs_name!
 
-    locSNP_file = os.path.join(data_folder_html, "gwSigLociSNPs.csv")
-    sigSNPs_dict = {}
-    with open(locSNP_file, "r") as fin:
-        counter = 0
-        for l in fin:
-            counter +=1
-            l_toks = l.rstrip().split(",")
-            if counter==1:
-                header=l_toks  # locusID,sentinelSNPID,locusSNPID,r2withSentinel
-            else:
-                cur_dict = dict(zip(header, l_toks))
-                curID = cur_dict["locusSNPID"]
-                sigSNPs_dict[curID] = cur_dict
-    fin.close()
-    locSNPIDs_set = set(sigSNPs_dict.keys())
-
     sentinelSNPs_file = os.path.join(data_folder_html, "gwSigLociSummary.csv")
     sentinelDict = {}
     with open(sentinelSNPs_file, "r") as fin:
@@ -152,14 +136,38 @@ def make_combined_SNPs_info_file():
                 sentinelDict[curID] = cur_dict
     fin.close()
 
+    locSNP_file = os.path.join(data_folder_html, "gwSigLociSNPs.csv")
+    SNP_IDs = []
+    chr_SNP_keys = []
+    sigSNPs_dict = {}
+    with open(locSNP_file, "r") as fin:
+        counter = 0
+        for l in fin:
+            counter +=1
+            l_toks = l.rstrip().split(",")
+            if counter==1:
+                header=l_toks  # locusID,sentinelSNPID,locusSNPID,r2withSentinel
+            else:
+                cur_dict = dict(zip(header, l_toks))
+                curID = cur_dict["locusSNPID"]
+                SNP_IDs.append(curID)
+                chr_SNP_keys.append("{}; {}".format(sentinelDict[cur_dict["sentinelSNPID"]]["CHR"], curID))
+                sigSNPs_dict[curID] = cur_dict
+    fin.close()
+    locSNPIDs_set = set(sigSNPs_dict.keys())
+    # sanity checks
+    print([len(SNP_IDs), len(set(SNP_IDs))])
+    print([len(chr_SNP_keys), len(set(chr_SNP_keys))])
+
     # go through slice1_result.txt for each chromosome
     sigSNPS_outfile = os.path.join(data_folder_html, "info_sigSNPs.csv")
     SNPS_outfile = os.path.join(data_folder_html, "info_SNPs.csv")
+    SNPS_outfile = os.path.join(data_folder_html, "info_SNPs_v2.csv")
     with open(sigSNPS_outfile, "w") as fout_sig:
         fout_sig.write("SNP,chr,pos,A1,num_sig,bonf,sentinel\n")
         with open(SNPS_outfile, "w") as fout:
-            # fout.write("SNP,chr,pos,A1\n")
-            fout.write("SNP,chr\n")    # bare minimum
+            fout.write("SNP,chr,pos\n")
+            # fout.write("SNP,chr\n")    # bare minimum
 
             for cdx, chromosome in enumerate(CHROMOSOMES):
                 fpath = os.path.join(data_folder_raw, "chr{}".format(chromosome), "slice1_result.txt")
@@ -183,7 +191,8 @@ def make_combined_SNPs_info_file():
                                             sentinel_data["nPixelsLocus"], sentinel_data["BonferroniSig"], is_sentinel]
                                 fout_sig.write("{}\n".format(",".join([str(x) for x in out_vals])))
                             else:
-                                out_vals = [curID, chromosome]  # bare minimum
+                                # out_vals = [curID, chromosome]  # bare minimum
+                                out_vals = [curID, chromosome, cur_dict["POS"]]  # bare minimum
                                 fout.write("{}\n".format(",".join([str(x) for x in out_vals])))
                 fin.close()
         fout.close()
