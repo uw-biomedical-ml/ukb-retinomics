@@ -184,11 +184,11 @@ var mac_yfunc = d3.scaleBand().range([ 0, height ]).domain(d3.range(1, NUM_SLICE
 var mac_yfunc2 = d3.scaleLinear().range([ 0, height ]).domain([1, NUM_SLICES]);
 
 /*
-var cur_chr = 22;
-var cur_SNP = "rs9330813";
-*/
 var cur_chr = 12;
 var cur_SNP = "rs3138142";
+*/
+var cur_chr = 22;
+var cur_SNP = "rs9330813";
 var prev_SNP;
 // NB python code swapped x,y; x should range 1-256, and y from 1-128
 var cur_xs = 76;
@@ -735,7 +735,7 @@ var freeze_mac = false;
 
     // Build color scale
     let field_vals = d3.map(sdata, d=>d[fieldName]);
-    let temp = get_color_min_max(field_vals);
+    let temp = fieldName=="pvalue" ? get_color_min_max(field_vals):get_color_min_max(field_vals,1); // chop off extrema for pvalue
     let cmin = temp[0],
         cmax = temp[1];
     var mac_color = make_mac_color(fieldName, cmin, cmax);
@@ -1086,7 +1086,8 @@ var freeze_mac = false;
            .style("left", (e.pageX +10) +"px")
            .style("top", (e.pageY +10) +"px")
            //.style("color", "lime")
-           .html(d.SNP +"(chr" +d.chr +"; pos=" +d3.format(".2e")(d.pos) +"):<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+           //.html(d.SNP +"(chr" +d.chr +"; pos=" +d3.format(".2e")(d.pos) +"):<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+           .html(d.SNP +"(chr" +d.chr +"; pos=" +d.pos +"):<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
       }
 
       // Build Y scales and axis:
