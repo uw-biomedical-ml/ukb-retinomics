@@ -137,8 +137,8 @@
     <div class="col-2">
       <h5>Usage Guide</h5>
       <ul>
-        <li>Click a heatmap to load manhanttan plots for selected macula location</li>
-        <li>Click a SNP in manhattan plot to load its heatmaps and zoom on SNP</li>
+        <li>Click a heatmap to load Manhattan plots for selected macula location</li>
+        <li>Click a SNP in Manhattan plot to load its heatmaps and zoom on SNP</li>
         <li>Search for SNPs directly, select them and see their heatmaps</li>
         <li>Search by SNP position range, e.g. chr3:1-1000000 displays the first million bases of chromosome 3, counting from the p-arm telomere</li>
       </ul>
@@ -342,7 +342,8 @@ var freeze_mac = false;
     return myPromise;
   }  
   async function get_info_data_all_bin() {
-    let fpath = "data/gwas/info_SNPs.csv.gz";
+    //let fpath = "data/gwas/info_SNPs.csv.gz";
+    let fpath = "data/gwas/info_SNPs_v2.csv.gz";
 
     let myPromise = new Promise(function(resolve) {
       const req = new XMLHttpRequest();
@@ -1306,4 +1307,9 @@ async function on_SNP_click(SNP) {
   
   // repaint heatmaps
   await change_macula(SNP, "beta");
-  change_macula(SNP
+  change_macula(SNP, "pvalue");
+}
+</script>
+
+</body>
+</html>
