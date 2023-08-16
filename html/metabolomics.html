@@ -252,7 +252,9 @@ var bar_thresh = 0.05;
     let loc_promise = get_loc_data_bin();  // using compressed files - even smaller
     myPromises.push(loc_promise);       // needed it for 1st display
 
-    get_info_data();  // can load in background
+    //get_info_data();  // can load in background
+    let info_promise = get_info_data();
+    myPromises.push(info_promise);
     return myPromises;
   }
   async function get_info_data() {
@@ -975,7 +977,7 @@ var bar_thresh = 0.05;
     // filter data for significant metabolites and sorted
     let fieldName = "beta";
     let data_filtered = d3.filter(sdata, d => {return d.pvalue < bar_thresh} );
-    let data_filtered_sorted = data_filtered.sort((a, b) => -a[fieldName] + b[fieldName] );
+    let data_filtered_sorted = data_filtered.sort((a, b) => a[fieldName] - b[fieldName] );
 
     // Add Y axis - same as volcano X axis
     bar_y = d3.scaleLinear()
@@ -1146,12 +1148,12 @@ var bar_thresh = 0.05;
     let msg;
     switch(fieldName) {
       case "beta":
-        display_text = "Effect Size";
-        msg = display_text +" Heatmap of " +met +" on Macula" ;
+        display_text = "Effect Size heatmap: ";
+        msg = display_text +info_dict[met]["desc"];
         break;
       case "pvalue":
-        display_text = "p-value";
-        msg = "Adjusted p-value Heatmap of " +met +" on Macula";
+        //msg = "Adjusted p-value Heatmap of " +met +" on Macula";
+        msg = "Adjusted P-value Heatmap: " +info_dict[met]["desc"];
         break;
       case "meanThick":
         display_text = "Mean Retinal Thickness";
@@ -1164,14 +1166,14 @@ var bar_thresh = 0.05;
     return msg;
   }
   function make_volcano_msg(xs, ys) {
-    let msg = "Volcano for grid location: " +xs +", " +ys;
+    let msg = "Volcano plot for grid location: " +xs +", " +ys;
     if (freeze_vol) {
       msg += " (Locked - click a heatmap to unlock)";
     }
     return msg;
   }
   function make_bar_msg(xs, ys) {
-    let msg = "Bar of significant metabolites for grid location: " +xs +", " +ys;
+    let msg = "Bar plot of significant metabolites for grid location: " +xs +", " +ys;
     if (freeze_vol) {
       msg += " (Locked - click a heatmap to unlock)";
     }

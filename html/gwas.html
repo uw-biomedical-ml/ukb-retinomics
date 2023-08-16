@@ -786,7 +786,7 @@ var freeze_mac = false;
         .text(make_macula_msg(SNP, fieldName));
 
       drawETDRS(targetID);
-      
+
       var mousemove = function(e, d) {
         console.log("in mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_manhattan:" +freeze_manhattan);
         d3.select("#div_tooltip").selectAll(".tooltip").remove();
@@ -877,7 +877,7 @@ var freeze_mac = false;
     manhattan_y = d3.scaleLog()
                     .range([ height, 0 ])
                     .domain([max_pval, min_pval])
-                    */    
+                    */
     manhattan_y = d3.scaleLinear()
                     .range([ height, 0 ])
                     .domain([-Math.log10(max_pval), -Math.log10(min_pval)]);
@@ -949,8 +949,8 @@ var freeze_mac = false;
   
       console.log("in change_manhattan; after sdata set");
       render_manhattan_helper(manhattan_svg, sdata, xs, ys, SNP, change_mode=1);
-    }    
-	}
+    }
+  }
   function render_manhattan_helper(manhattan_svg, sdata, xs, ys, SNP, change_mode=0) {
     console.log("in render_manhattan_helper; xs:" +xs +"; ys:" +ys +"; SNP:" +SNP +"; change_mode:" +change_mode);
 
@@ -1127,21 +1127,31 @@ var freeze_mac = false;
                       .attr("d",l1)
                       .attr("stroke", "red")
                       .attr("stroke-width", 1)
+                      
+      // Add bonfLabel to graph
+      manhattan_svg.selectAll("#bonfLabel")
+                   .join()
+                      .attr("x", width-25)
+                      .attr("y", manhattan_y(-Math.log10(manhattan_thresh))-12.5)
+                      .attr("text-anchor", "left")
+                      .attr("class", "h5")
+                      .text("Bonferroni");
     } else {
-    manhattan_svg.append("path")
-                  .attr("id", "bonfLine")
-                  .attr("d",l1)
-                  .attr("stroke", "red")
-                  .attr("stroke-width", 1)
-    }
+      manhattan_svg.append("path")
+                   .attr("id", "bonfLine")
+                   .attr("d",l1)
+                   .attr("stroke", "red")
+                   .attr("stroke-width", 1)
+                  
     // Add bonfLabel to graph
-    manhattan_svg.selectAll("#bonfLabel")
-                 .join()
-                    .attr("x", width-25)
-                    .attr("y", manhattan_y(-Math.log10(manhattan_thresh))-12.5)
-                    .attr("text-anchor", "left")
-                    .attr("class", "h5")
-                    .text("Bonferroni");
+      manhattan_svg.append("text")
+                   .attr("id", "bonfLabel")
+                   .attr("x", width-25)
+                   .attr("y", manhattan_y(-Math.log10(manhattan_thresh))-12.5)
+                   .attr("text-anchor", "left")
+                   .attr("class", "h5")
+                   .text("Bonferroni");
+    }
   }
   
   function label_SNPs(d) {
@@ -1149,7 +1159,7 @@ var freeze_mac = false;
     if (d.pvalue < manhattan_thresh) { 
       //return d.snip; 
       return d.SNP; 
-    } else { 
+    } else {
       return ""; 
     } 
   }
@@ -1160,12 +1170,12 @@ var freeze_mac = false;
     let msg;
     switch(fieldName) {
       case "beta":
-        display_text = "Effect Size";
-        msg = display_text +" Heatmap of " +SNP +" on Macula";
+        display_text = "Effect Size Heatmap: ";
+        msg = display_text +SNP;
         break;
       case "pvalue":
-        display_text = "p-value";
-        msg = display_text +" Heatmap of " +SNP +" on Macula";
+        display_text = "P-value Heatmap: ";
+        msg = display_text +SNP;
         break;
       case "meanThick":
         display_text = "Mean Retinal Thickness";
@@ -1180,9 +1190,11 @@ var freeze_mac = false;
   function make_manhattan_msg(xs, ys, SNP) {
     let msg = ""; 
     if (SNP!=null) {
-      msg = "Zoomed Manhattan for " +cur_SNP +" on chr" +cur_chr;
+      //msg = "Zoomed Manhattan for " +cur_SNP +" on chr" +cur_chr;
+      msg = "Region plot (chr " +cur_chr +"; " +cur_SNP +") grid location " +xs +", " +ys;
     } else {
-      msg = "Manhattan of sentinel and significant SNPs for grid location: " +xs +", " +ys;
+      // msg = "Manhattan of sentinel and significant SNPs for grid location: " +xs +", " +ys;
+      msg = "Manhattan plot: grid location " +xs +", " +ys;
     }
     if (freeze_manhattan) {
       msg += " (Locked - click a heatmap to unlock)";
@@ -1196,7 +1208,7 @@ var freeze_mac = false;
     }
     return msg;
   }
-  
+
 render();
 
 // filter function
@@ -1240,7 +1252,7 @@ function filterSNPs() {
     } else {
       let init_pos = parseInt(pos_results[0]),
           end_pos = parseInt(pos_results[1]);
-      filtered_SNPs = d3.filter(SNP_info_data, d => { return (d.chr==chr_str.toUpperCase()) && (d.pos > init_pos) && (d.pos < end_pos) });
+      filtered_SNPs = d3.filter(SNP_info_data, d => { return (d.chr==chr_str.toUpperCase()) && (d.pos > init_pos) && (d.pos <= end_pos) });
     }
   } else {
     filtered_SNPs = d3.filter(SNP_info_data, d => { return d.SNP.toLowerCase().indexOf(filter) > -1 });
