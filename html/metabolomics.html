@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8">
 
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8ENNDX81GB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8ENNDX81GB');
+</script>
+
   <link href="sources/bootstrap.min.css" rel="stylesheet" />
   <script src="sources/bootstrap.bundle.min.js"></script>
   <script src="sources/d3.min.js"></script>
@@ -51,16 +61,16 @@
           <a class="nav-link active" href="./metabolomics.html">Metabolomics</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link disabled" href="./icd10.html">ICD10</a>
+          <a class="nav-link" href="./icd10.html">ICD10</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link disabled" href="./hematology.html">Hematology</a>
+          <a class="nav-link" href="./hematology.html">Hematology</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link disabled" href="./infections.html">Infections</a>
+          <a class="nav-link" href="./infections.html">Infections</a>
         </li>
         <li class="nav-item">
-          <a class="nav-link disabled" href="./prs.html">PRS</a>
+          <a class="nav-link" href="./prs.html">PRS</a>
         </li>
       </ul>
     </div>
@@ -149,7 +159,6 @@
 </div>
 
 <script>
-var updateStatus = false;
 var COLOR_LIME = "rgb(50, 205, 50)";
 
 var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
@@ -309,22 +318,14 @@ var bar_thresh = 0.05;
     return myPromise;
   }
   function loading_ui() {
-    if (!updateStatus) {  // first load
-      document.getElementById("loadingData").style.display = "inherit";
-    } else {
-      document.getElementById("loadingData").style.display = "inherit";
-      // document.getElementById("bodyContainer").classList.add("spinner-grow", "m5");
-      document.getElementById("bodyContainer").classList.add("bg-secondary");
-    }
+    document.getElementById("loadingData").style.display = "inherit";
+    // document.getElementById("bodyContainer").classList.add("spinner-grow", "m5");
+    document.getElementById("bodyContainer").classList.add("bg-secondary");
   }
   function loaded_ui() {
-    if (!updateStatus) {
-      document.getElementById("loadingData").style.display = "none";
-    } else {
-      document.getElementById("loadingData").style.display = "none";
-      // document.getElementById("bodyContainer").classList.remove("spinner-grow", "m5");
-      document.getElementById("bodyContainer").classList.remove("bg-secondary");
-    }
+    document.getElementById("loadingData").style.display = "none";
+    // document.getElementById("bodyContainer").classList.remove("spinner-grow", "m5");
+    document.getElementById("bodyContainer").classList.remove("bg-secondary");
   }
   async function get_loc_data_bin() {
     // NB python code swapped x,y; x should range 1-256, and y from 1-128
@@ -638,7 +639,7 @@ var bar_thresh = 0.05;
 
       if (met!=cur_met) {
         cur_met = met;
-        updateStatus = true;
+
         loading_ui();
         sdata = await get_met_data_bin(); // using compressed files
         loaded_ui();
@@ -654,13 +655,10 @@ var bar_thresh = 0.05;
   }
   function render_macula_helper(targetID, target_svg, sdata, fieldName, change_mode=0) {
     // Build color scale
-    /*
-    const cmin = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.05);
-    const cmax = d3.quantile(d3.map(sdata, d=>d[fieldName]), 0.95);
-    */
     let field_vals = d3.map(sdata, d=>d[fieldName]);
-    const cmin = d3.min(field_vals);
-    const cmax = d3.max(field_vals);
+    let temp = fieldName=="pvalue" ? get_color_min_max(field_vals):get_color_min_max(field_vals,1); // chop off extrema for pvalue
+    let cmin = temp[0],
+        cmax = temp[1];
     var mac_color = make_mac_color(fieldName, cmin, cmax);
     heatmap_bar_width = mac_xfunc.bandwidth();
     
@@ -752,7 +750,8 @@ var bar_thresh = 0.05;
         .on("mousedown", mousemove);
     }
     
-    render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, heatmap_bar_width);
+    let temp2 = get_color_min_max(field_vals, 1);    
+    render_colorbar(targetID, fieldName, sdata, temp2[0], temp2[1], mac_color, heatmap_bar_width);
     highlight_coord(target_svg, cur_xs, cur_ys);
   }
 
@@ -774,7 +773,6 @@ var bar_thresh = 0.05;
       cur_xs=xs;
       cur_ys=ys;
 
-      updateStatus =true;
       loading_ui();
       sdata = await get_loc_data_bin();
       loaded_ui();
@@ -789,16 +787,18 @@ var bar_thresh = 0.05;
 	}
   function render_volcano_helper(sdata, xs, ys, change_mode=0) {
     // data range
-    /*
-    const cmin = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.05);
-    const cmax = d3.quantile(d3.map(sdata, d=>d.pvalue), 0.95);
-    */
     let loc_pvals = d3.map(sdata, d=>d.pvalue);
-    const cmin = d3.min(loc_pvals);
-    const cmax = d3.max(loc_pvals);
+    let temp = get_color_min_max(loc_pvals); // chop off extrema for pvalue
+    let cmin = temp[0],
+        cmax = temp[1];
     let loc_betas = d3.map(loc_data, d=>d.beta);
-    vol_s_min = d3.min(loc_betas);
-    vol_s_max = d3.max(loc_betas);
+    let temp2 = get_color_min_max(loc_betas, 1); // don't chop off extrema for beta
+    vol_s_min = temp2[0];
+    vol_s_max = temp2[1];
+    
+    let temp3 = get_color_min_max(loc_pvals, 1); // for y-axis
+    let cmin2 = temp3[0],
+        cmax2 = temp3[1];
 
     // axis
     vol_x = d3.scaleLinear()
@@ -806,12 +806,11 @@ var bar_thresh = 0.05;
               .domain([vol_s_min, vol_s_max])
     vol_y = d3.scaleLinear()
               .range([ height, 0 ])
-              .domain([-Math.log10(max_pval), -Math.log10(cmin)]);
+              .domain([-Math.log10(max_pval), -Math.log10(cmin2)]);
 
     // Build color scale
     vol_color = d3.scaleSequential()
                   .interpolator(d3.interpolateBlues)
-                  //.domain([cmax, Number.MIN_VALUE]);
                   .domain([-Math.log10(0.05), -Math.log10(cmin)]);
 
     if (change_mode==1) {
@@ -964,7 +963,6 @@ var bar_thresh = 0.05;
       cur_xs = xs;
       cur_ys = ys;
 
-      updateStatus = true;
       loading_ui();
       sdata = await get_loc_data_bin();
       loaded_ui();
@@ -990,10 +988,10 @@ var bar_thresh = 0.05;
               .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }));
 
     // Build color scale
-    //const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.05);
-    //const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0.95);
-    const cmin = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 0);
-    const cmax = d3.quantile(d3.map(data_filtered_sorted, d=>d[fieldName]), 1);
+    let field_vals = d3.map(sdata, d=>d[fieldName]);
+    let temp = fieldName=="pvalue" ? get_color_min_max(field_vals):get_color_min_max(field_vals,1); // chop off extrema for pvalue
+    let cmin = temp[0],
+        cmax = temp[1];
     var mac_color = make_mac_color(fieldName, cmin, cmax);
 
     if (change_mode==1) {
@@ -1245,6 +1243,20 @@ function filterBiomarkers() {
   }
 }
 
+function get_color_min_max(field_vals, min_max=0) {
+  let cmin;
+  let cmax;
+  if (min_max==1) {
+    cmin = d3.min(field_vals);
+    cmax = d3.max(field_vals);
+    console.log("min_max=1; cmin=" +cmin +"; cmax=" +cmax);
+  } else {
+    cmin = d3.quantile(field_vals, 0.05);
+    cmax = d3.quantile(field_vals, 0.95);
+    console.log("min_max=0; cmin=" +cmin +"; cmax=" +cmax);
+  }
+  return [cmin, cmax];
+}
 async function on_biomarker_click(biomarker) {
   console.log(biomarker);
   // UI

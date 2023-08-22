@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8ENNDX81GB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8ENNDX81GB');
+</script>
+
+  <link href="sources/bootstrap.min.css" rel="stylesheet" />
+  <script src="sources/bootstrap.bundle.min.js"></script>
+  <script src="sources/d3.min.js"></script>
+  <script src="sources/pako.js"></script>
+
+  <style>
+    #myInput {
+      background-image: url('/css/searchicon.png'); /* Add a search icon to input */
+      background-position: 10px 12px; /* Position the search icon */
+      background-repeat: no-repeat; /* Do not repeat the icon image */
+      width: 100%; /* Full-width */
+      font-size: 16px; /* Increase font-size */
+      padding: 12px 20px 12px 40px; /* Add some padding */
+      border: 1px solid #ddd; /* Add a grey border */
+      margin-bottom: 12px; /* Add some space below the input */
+    }
+
+    #myTable tr.header, #myTable tr:hover {
+      /* Add a grey background color to the table header and on hover */
+      background-color: #f1f1f1;
+    }
+    .table-overflow {
+      overflow-y:scroll;
+      max-height:300px;
+      display:block;
+    }
+  </style>
+
+  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav">
+        <a class="navbar-brand" href="./index.html">
+          <img src="./imgs/Retinomics_logo_small.png" alt="Retinomics" width="50" height="50">
+        </a>
+        <li class="nav-item">
+          <a class="nav-link" href="./index.html">Home</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./gwas.html">GWAS</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./icd10.html">ICD10</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./hematology.html">Hematology</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="./infections.html">Infections</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./prs.html">PRS</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
+</head>
+
+<body>
+
+<div class="container-fluid" id="bodyContainer" style="background-color:#CCC"> <!-- max-width:1320 from bootstrap -->
+  
+  <div class="row" style="width:50%">
+    <button class="btn btn-primary col-2" id="loadingData">
+      <span class="spinner-border spinner-border-sm"></span>
+      Loading..
+    </button>
+
+    <div class="form-group col-10">
+      <input type="text" class="form-control" id="myInput" onkeyup="filterBiomarkers()" onkeydown="loadBiomarker(this)" placeholder="Search for infections">
+    </div>
+
+    <table id="myTable" class="table table-striped table-overflow" style="display:none;">
+      <thead>
+        <tr class="header thead-dark">
+          <th style="width:15%;">Infection</th>
+          <th style="width:60%;">Desc</th>
+          <th style="width:25%;">% Significant Macula Points</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="row">
+    <div class="col-4">
+      <div class="row" style="--bs-gutter-x:0">
+        <div id="heatmap_beta_colorbar" class="col-1" style="display:flex; flex-wrap:wrap;"></div>
+
+        <div id="heatmap_beta" class="col-11"></div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="row">
+        <div id="heatmap_pvalue_colorbar" class="col-1"></div>
+        
+        <div id="heatmap_pvalue" class="col-11"></div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="row">
+        <div id="heatmap_meanThick_colorbar" class="col-1"></div>
+
+        <div id="heatmap_meanThick" class="col-11"></div>
+      </div>
+    </div>
+  </div>  
+  <div class="row">
+    <div class="col-4">
+      <div id="volcano"></div>
+    </div>
+    
+    <div class="col-6">
+      <div id="horizontal_bar"></div>
+    </div>
+    <div class="col-2">
+      <h5>Usage Guide</h5>
+      <ul>
+        <li>Click a heatmap to load volcano and bar plots for selected macula location (highlighted in green)</li>
+        <li>Click an infection in volcano or bar plot to load its heatmaps</li>
+        <li>Search for infections directly, select them and see their heatmaps</li>
+      </ul>
+    </div>
+  </div>
+  
+  <div id="div_tooltip"></div>
+</div>
+
+<script>
+var COLOR_LIME = "rgb(50, 205, 50)";
+
+var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
+var margin = {top: 75, right: 70, bottom: 30, left:35},
+    width = max_size - margin.left - margin.right,
+    height = max_size - margin.top - margin.bottom;
+console.log(width +";" +height);
+var colorbar_width = margin.left+10+25;
+var heatmap_bar_width =10;
+var bar_width = width*2;
+
+var info_dict = {};
+var info_array = [];
+var thickness_data;
+var loc_data;
+var met_data;
+var volcano_svg;
+var bar_svg;
+var heatmap_svgs = {};
+
+var NUM_SLICES = 128;
+var NUM_COORDS = 256;
+var NUM_GRID_POINTS = 29274;
+var PIXEL_TO_MICRONS_THICKNESS = (2.275*1000)/650 / 1000000;
+var CHR_NUM_SLIPS_DICT = {"1": 842491, "2":913413, "3":774528, "4":796789, "5":706769, "6":733026, "7":639645, "8":600401, "9":468652, "10":553430, "11":539166, "12":524442, "13":398578, "14":353816, "15":309546, "16":335728, "17":293820, "18":309206, "19":252330, "20":240886, "21":148455, "22":149315, "X":354574};
+
+var mac_xfunc = d3.scaleBand().range([ 0, width ]).domain(d3.range(1, NUM_COORDS+1));
+var mac_xfunc2 = d3.scaleLinear().range([ 0, width ]).domain([1, NUM_COORDS]);
+var mac_yfunc = d3.scaleBand().range([ 0, height ]).domain(d3.range(1, NUM_SLICES+1));
+var mac_yfunc2 = d3.scaleLinear().range([ 0, height ]).domain([1, NUM_SLICES]);
+
+var cur_xs = 128;
+var cur_ys = 64;
+var cur_met = "hpv_16_definition_ii_seropositivity_for_human_papillomavirus_type16";
+
+var max_pval = 1;
+var MIN_PVALUE = 1e-10;
+var vol_x;
+var vol_y;  // now updated in render_volcano and change_volcano
+var vol_color;
+var vol_s_min;
+var vol_s_max;
+
+var freeze_vol = false;
+var freeze_mac = false;
+
+var bar_x;
+var bar_y;
+var bar_tooltip;
+var bar_mousemove;
+var bar_mouseclick;
+var bar_thresh = 0.05;
+  
+  function init_svg() {
+    console.log("in init_svg");
+
+    // set the dimensions and margins of the graph
+    // append the svg object to the body of the page
+    volcano_svg = d3.select("#volcano")
+      .append("svg")
+      .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    let fieldNames = ["beta", "pvalue", "meanThick"];
+    for (let i=0; i<fieldNames.length; i++) {
+      init_heatmap(fieldNames[i]);
+    }
+  }
+  function init_heatmap(fieldName) {
+    console.log("in init_heatmap; fieldName:" +fieldName);
+
+    let domID = "#heatmap" +"_" +fieldName;
+    heatmap_svgs[fieldName] = d3.select(domID)
+                                .append("svg")
+                                .attr("width", width + margin.left + margin.right)
+                                .attr("height", height + margin.top + margin.bottom)
+                                .append("g")
+                                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+    
+    heatmap_svgs[fieldName+"_colorbar"] = d3.select(domID +"_colorbar")
+                                            .append("svg")
+                                            .attr("width", colorbar_width)
+                                            .attr("height", height + margin.top + margin.bottom)
+                                            .append("g")
+                                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+  }
+  async function get_data() {
+    var myPromises = [];
+
+    let thickness_promise = get_thickness_data_bin(); // using compressed files
+    myPromises.push(thickness_promise);
+
+    let met_promise = get_met_data_bin(); // using compressed files
+    myPromises.push(met_promise);
+
+    let loc_promise = get_loc_data_bin();  // using compressed files - even smaller
+    myPromises.push(loc_promise);       // needed it for 1st display
+
+    //get_info_data();  // can load in background
+    let info_promise = get_info_data();
+    myPromises.push(info_promise);
+    return myPromises;
+  }
+  async function get_info_data() {
+    console.log("get_info_data; before d3.csv");
+
+    let fpath = "data/immunomics_data_export/infect/infect_info.csv";
+    info_array = await d3.csv(fpath, function(d) {
+      //console.log("get_info_data; in d3.csv");
+
+      let curDict = { "bmarker":d.Biomarker, "col.name":d["col.name"], "parallel_group":d.parallel_group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC, "p":d.p, "sds":d.sds };
+      info_dict[d.Biomarker] = curDict;
+      return curDict;
+    });
+  }
+  async function get_thickness_data_bin() {
+    let fpath = "data/mean_thickness.gz";
+
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true; // default async
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer";
+      
+      console.log("get_thickness_data_bin; before load");
+      req.onload = (event) => {
+        console.log("get_thickness_data_bin; on load");
+        
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_thickness_data_bin; in arrayBuffer");
+
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_thickness_data_bin; after deflate: " +curData.length);
+
+          //console.log(curData);
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_thickness_data_bin; after decode: " +data_str.length);
+
+          //console.log(data_str);
+          thickness_data = d3.csvParse(data_str, function(d) {
+            return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
+          });
+          resolve(thickness_data);
+        } else {
+          console.log("File not found: " +fpath);
+          resolve(null);
+        }
+      };
+      
+      req.send(null);
+    });
+    return myPromise;
+  }
+  function loading_ui() {
+    document.getElementById("loadingData").style.display = "inherit";
+    document.getElementById("bodyContainer").classList.add("bg-secondary");
+  }
+  function loaded_ui() {
+    document.getElementById("loadingData").style.display = "none";
+    document.getElementById("bodyContainer").classList.remove("bg-secondary");
+  }
+  async function get_loc_data_bin() {
+    // NB python code swapped x,y; x should range 1-256, and y from 1-128
+    let fpath = "data/immunomics_data_export/infect/location_summary/location_summary_" +cur_ys +"_" +cur_xs +".csv.gz";
+    
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true;
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer"; 
+      
+      console.log("get_loc_data; before load");
+      req.onload = (event) => {
+        console.log("get_loc_data; on load");
+        
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_loc_data_bin; in arrayBuffer");
+
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_loc_data_bin; after deflate: " +curData.length);
+
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_loc_data_bin; after decode: " +data_str.length);
+          
+          loc_data = d3.csvParse(data_str, function(d) {
+            let temp = parseFloat(d.adjPVal);
+            temp = temp==0 ? Number.MIN_VALUE:temp;
+            return { "metabolite": d.met, "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp};
+          });
+          resolve(loc_data);
+        } else {
+          console.log("File not found: " + fpath);
+          resolve(null);
+        }
+      };
+      req.send(null);
+    });
+    
+    return myPromise;
+  }
+  async function get_met_data_bin() {
+    let fpath = "data/immunomics_data_export/infect/gzip/" +cur_met +".csv.gz";
+    
+    let myPromise = new Promise(function(resolve) {
+      const req = new XMLHttpRequest();
+      let asyncFlag = true;
+      req.open("GET", fpath, asyncFlag);
+      req.responseType = "arraybuffer";
+
+      console.log("get_met_data_bin; before load");
+      req.onload = (event) => {
+        console.log("get_met_data_bin; on load");
+
+        if (req.status==200) {
+          const arrayBuffer = req.response; // Note: not req.responseText
+          console.log("get_met_data_bin; in arrayBuffer");
+        
+          var curData = pako.inflate(arrayBuffer);
+          console.log("get_met_data_bin; after deflate: " +curData.length);
+
+          var data_str = new TextDecoder().decode(curData);
+          console.log("get_met_data_bin; after decode: " +data_str.length);
+
+          met_data = d3.csvParse(data_str, function(d) {
+            let temp = parseFloat(d.adjPVal);
+            temp = temp==0 ? Number.MIN_VALUE:temp;
+            return { "y": parseInt(d.slice_num), "x": parseInt(d.coord_num), "beta": parseFloat(d.logFC), "pvalueRaw":parseFloat(d.PValue), "pvalue":temp };
+          });
+          resolve(met_data);
+        } else {
+          console.log("File not found: " +fpath);
+          resolve(null);
+        }
+      };
+      req.send(null);
+    });
+
+    return myPromise;
+  }
+
+  async function render() {
+    console.log("in render");
+
+    init_svg();
+
+    //Read the data
+    console.log("before data load");
+    
+    loading_ui();
+    let myPromises = await get_data();
+    Promise.all(myPromises).then(fileContents => {
+      render_mac("Total_C", "beta");
+      render_mac("Total_C", "pvalue");
+      render_mac(null, "meanThick");
+      render_volcano(cur_xs, cur_ys);
+      render_bar(cur_xs, cur_ys);
+  
+      console.log("after data load");
+      loaded_ui();
+    });
+  }
+  
+  async function render_colorbar(targetID, fieldName, sdata, cmin, cmax, mac_color, bandwidth) {
+    console.log("in render_colorbar; " +targetID +"; fieldName:" +fieldName +"; ");
+
+    const target_colorbar_svg = heatmap_svgs[targetID +"_colorbar"];
+    target_colorbar_svg.selectAll("text").remove(); // cleanup
+
+    const cmax_transformed = cmax;
+    const cmin_transformed = cmin;
+    let suffix = "";
+    let num_format;
+    switch (fieldName) {
+      case "pvalue":
+        num_format = ".0e";
+        break;
+      case "beta":
+        num_format = ".2f";
+        break;
+      case "meanThick":
+        num_format = ".2s";
+        suffix = "m";
+        break;
+    }
+
+    target_colorbar_svg.append("text")
+                      .attr("text-anchor", "end")
+                      .attr("x", fieldName=="meanThick" ? 15:10)
+                      .attr("y", 0)
+                      .text(d3.format(num_format) (fieldName=="pvalue" ? cmin_transformed:cmax_transformed)+suffix);
+
+    target_colorbar_svg.append("text")
+                      .attr("text-anchor", "end")
+                      .attr("x", fieldName=="meanThick" ? 15:10)
+                      .attr("y", height + 10)
+                      .text(d3.format(num_format) (fieldName=="pvalue" ? cmax_transformed:cmin_transformed)+suffix);
+      
+    // Build colorbar Y scale
+    var y_fieldName;
+    var color_ticks; 
+    var sdata2 = [];
+    var yrange;
+    if (fieldName=="pvalue") {
+      color_ticks = d3.ticks(Math.log10(cmax), Math.log10(cmin), NUM_SLICES);
+      yrange = d3.range(1, color_ticks.length+1);
+      for (let subdx=0; subdx < color_ticks.length; subdx++) {
+        let temp = {"y":yrange[subdx]};
+        temp[fieldName] = Math.pow(10, color_ticks[subdx]);
+        sdata2.push(temp);
+      }
+      sdata =sdata2;
+    } else {
+      color_ticks = d3.ticks(cmin, cmax, NUM_SLICES);
+      yrange = d3.range(1, color_ticks.length+1);
+      
+      for (let subdx=0; subdx < color_ticks.length; subdx++) {
+        let temp = {"y":yrange[subdx]}
+        temp[fieldName] = color_ticks[subdx];
+        sdata2.push(temp);
+      }
+      sdata = sdata2;
+    }
+    y_fieldName = d3.scaleBand()
+                        .range([ height, 0 ])
+                        .domain(yrange);
+
+    target_colorbar_svg.selectAll()
+      .data(sdata)
+      .enter()
+      .append("rect")
+      .attr("x", function(d) { return 1 })
+      .attr("y", function(d) { return y_fieldName(d.y) })
+      .attr("width", bandwidth )
+      .attr("height", y_fieldName.bandwidth() )
+      .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName) )
+      .style("stroke-width", 0)
+      .style("stroke", d=> extract_macula_heatmap_data(d, mac_color, fieldName) )
+  }
+  function extract_macula_heatmap_data(d, mac_color, fieldName) {
+    if (fieldName=='pvalue') {
+      return mac_color(-Math.log10(d[fieldName]));
+    } else {
+      return mac_color(d[fieldName]);
+    }
+  }
+  
+  function make_mac_color(fieldName, cmin, cmax) {
+    console.log("in make_mac_color; fieldName:" +fieldName +"; cmin:" +cmin +"; cmax:" +cmax);
+
+    var mac_color;
+    if (fieldName=="pvalue") {
+      // log scale colors - https://gist.github.com/RobinL/6b27f9abc591002779d294f1fdff6b72
+      mac_color = d3.scaleSequential()
+                    //.interpolator(d3.interpolateCividis)
+                    .interpolator(d3.interpolateBlues)
+                    .domain([-Math.log10(cmax), -Math.log10(cmin)]);
+    } else if (fieldName=="meanThick") {
+      mac_color = d3.scaleSequential()
+                    //.interpolator(d3.interpolateBlues)
+                    .interpolator(d3.interpolateViridis)
+                    .domain([cmin, cmax]);
+    } else {      
+      mac_color = d3.scaleLinear()
+                    .domain([cmax, 0, cmin])
+                    .range([d3.interpolateRdBu(1), d3.interpolateRdBu(0.5), d3.interpolateRdBu(0)]) ;
+    }
+    return mac_color;
+  }
+
+  function highlight_coord(target_svg, new_xs, new_ys) {
+    console.log("in highlight_coord: xs:" +new_xs +"; ys:" +new_ys);
+
+    let prev_elem = target_svg.selectAll("rect[x='" +mac_xfunc(cur_xs) +"'][y='" + mac_yfunc(cur_ys) +"']");
+    prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+    let cur_elem = target_svg.selectAll("rect[x='" +mac_xfunc(new_xs) +"'][y='" + mac_yfunc(new_ys) +"']");
+    cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+  }
+  function highlight_metabolite(target_svg, svg_name, new_met) {
+    console.log("in highlight_metabolite: ", svg_name +"; met:" +new_met);
+    
+    if (svg_name=="bar") {
+      let prev_elem = target_svg.selectAll("rect[metabolite='" +cur_met +"']");
+      prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+      let cur_elem = target_svg.selectAll("rect[metabolite='" +new_met +"']");
+      cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+    } else if (svg_name=="volcano") {
+      let prev_elem = target_svg.selectAll("circle[metabolite='" +cur_met +"']");
+      prev_elem.style("stroke-width", 0).style("stroke", COLOR_LIME); 
+      let cur_elem = target_svg.selectAll("circle[metabolite='" +new_met +"']");
+      cur_elem.style("stroke-width", 2).style("stroke", COLOR_LIME); 
+    }
+  }
+  function label_metabolites(d) {
+    console.log("in label_metabolites: " + d);
+    if (d.pvalue<0.05) { 
+      return d.metabolite; 
+    } else { 
+      return ""; 
+    } 
+  }
+
+  function drawETDRS(targetID) {
+    const target_svg = heatmap_svgs[targetID];
+    // 3 circles
+    var radii = [NUM_SLICES/2, NUM_SLICES/4, NUM_SLICES/12];
+    for (let rdx=0; rdx<radii.length; rdx++) {
+      target_svg.append("circle")
+                .attr("cx", mac_xfunc2(NUM_COORDS/2))
+                .attr("cy", mac_yfunc2(NUM_SLICES/2))
+                .attr("r", mac_yfunc2(radii[rdx]))
+                .style("stroke","black")
+                .style("stroke-width", 2)
+                .style("opacity", 1)
+                .style("fill-opacity",0)
+    }
+
+    // 4 lines
+    //const l1 = d3.line()([ [mac_xfunc2(1), mac_yfunc(NUM_SLICES/2)], [mac_xfunc2(NUM_COORDS/2-NUM_COORDS/12), mac_yfunc(NUM_SLICES/2)] ]);
+    const l1 = d3.line()([ [mac_xfunc2(NUM_COORDS/2)-mac_yfunc2(NUM_SLICES/2), mac_yfunc2(NUM_SLICES/2)], [mac_xfunc2(NUM_COORDS/2)-mac_yfunc2(NUM_SLICES/12), mac_yfunc2(NUM_SLICES/2)] ]);
+    const rotations = [45, 135, 225, 315];
+    for (let rdx=0; rdx<rotations.length; rdx++) {
+      target_svg.append("path")
+                .attr("d",l1)
+                .attr("stroke", "black")
+                .attr("stroke-width", 1)
+                .attr("transform", `rotate(${rotations[rdx]}, ${mac_xfunc2(NUM_COORDS/2)} ${mac_yfunc2(NUM_SLICES/2)})`)
+    }
+  }
+
+  async function render_mac(met, targetID) {
+    console.log("in render_mac: " +"; met:" +met +"; targetID:" +targetID);
+
+    const target_svg = heatmap_svgs[targetID];
+    let fieldName= targetID;  // alias 
+
+    const sdata = targetID=="meanThick" ? thickness_data:met_data;
+    render_macula_helper(targetID, target_svg, sdata, fieldName)
+  }
+
+  async function change_macula(met, targetID) {
+    console.log("in change_macula; met:" +met, "; targetID:" +targetID);
+    const target_svg = heatmap_svgs[targetID];
+    let fieldName = targetID;
+
+    target_svg.selectAll("#title")
+              .text(make_macula_msg(met, fieldName));
+
+    // get new snip data
+    if (fieldName!="meanThick") { // only highlight new coord if meanThick
+      let sdata;
+
+      if (met!=cur_met) {
+        cur_met = met;
+
+        loading_ui();
+        sdata = await get_met_data_bin(); // using compressed files
+        loaded_ui();
+
+        console.log("in change_macula; after sdata set");
+        render_macula_helper(targetID, target_svg, sdata, fieldName, change_mode=1)
+      } else {
+        sdata = met_data;
+        console.log("in change_macula; no data change");
+        render_macula_helper(targetID, target_svg, sdata, fieldName, change_mode=1)
+      }
+    }
+  }
+  function render_macula_helper(targetID, target_svg, sdata, fieldName, change_mode=0) {
+    // Build color scale
+    let field_vals = d3.map(sdata, d=>d[fieldName]);
+    // let temp = fieldName=="pvalue" ? get_color_min_max(field_vals):get_color_min_max(field_vals,1); // chop off extrema for pvalue
+    let temp = get_color_min_max(field_vals,1); // dont chop off extrema 
+    let cmin = temp[0],
+        cmax = temp[1];
+    var mac_color = make_mac_color(fieldName, cmin, cmax);
+    heatmap_bar_width = mac_xfunc.bandwidth();
+    
+    if (change_mode==1) {
+      target_svg.selectAll("rect")
+          .data(sdata)
+          .join()
+          .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
+          //.style("fill-opacity", function(d) { return 1- d.pvalue} )
+          .style("stroke-width", 0)
+          .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
+
+    } else {
+      target_svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("transform", "rotate(-90," +(width+15) +"," +height/2 +")")
+                .attr("x", width+20)
+                .attr("y", height/2)
+                .text("nasal");
+      target_svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("transform", "rotate(-90, -5," +height/2 +")")
+                .attr("x", 0)
+                .attr("y", height/2)
+                .text("temporal");
+      target_svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("y", -5)
+                .attr("x", width/2)
+                .text("superior");
+      target_svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("y", (height+15))
+                .attr("x", width/2)
+                .text("inferior");
+
+      // Add title to graph
+      target_svg.append("text")
+        .attr("id", "title")
+        .attr("x", 0)
+        .attr("y", -50)
+        .attr("text-anchor", "left")
+        .attr("class", "h5")
+        .text(make_macula_msg(cur_met, fieldName));
+  
+      var mousemove = async function(e, d) {
+        console.log("in mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+
+        freeze_mac = false;
+        if (! freeze_vol) {
+          highlight_coord(heatmap_svgs["beta"], d.x, d.y);
+          highlight_coord(heatmap_svgs["pvalue"], d.x, d.y);
+          highlight_coord(heatmap_svgs["meanThick"], d.x, d.y);
+          // update to show on macula heatmaps
+          await change_volcano(d.x, d.y);   // can await before change_bar to save a file load - but forces things sync
+          change_bar(d.x, d.y);
+        }
+      }
+      var mouseclick = function(e, d) {
+        console.log("in mouseclick: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+
+        freeze_mac = false;
+        if (freeze_vol) { 
+          freeze_vol = false;
+        } else { 
+          freeze_vol = true; 
+        }
+        volcano_svg.selectAll("#title")
+                   .text(make_volcano_msg(d.x, d.y));
+        bar_svg.selectAll("#title")
+               .text(make_bar_msg(d.x, d.y));
+      }
+
+      drawETDRS(targetID);
+
+      // add the squares - Use defined X scales and axis
+      target_svg.selectAll()
+        .data(sdata, function(d) {return d.x+':'+d.y;})
+        .enter()
+        .append("rect")
+        .attr("x", function(d) { return mac_xfunc(d.x) })
+        .attr("y", function(d) { return mac_yfunc(d.y) })
+        .attr("width", mac_xfunc.bandwidth() )
+        .attr("height", mac_yfunc.bandwidth() )
+        .style("fill", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
+        //.style("opacity", function(d) { return 1- d.pvalue} )
+        .style("stroke-width", 0)
+        .style("stroke", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
+        .on("mousedown", mousemove);
+    }
+    
+    let temp2 = get_color_min_max(field_vals, 1);    
+    render_colorbar(targetID, fieldName, sdata, temp2[0], temp2[1], mac_color, heatmap_bar_width);
+    highlight_coord(target_svg, cur_xs, cur_ys);
+  }
+
+  async function render_volcano(xs, ys) {
+    console.log("in render_volcano: ", "; xs:" +xs, "; ys:" +ys);
+
+    // when rendering/changing manhattan
+    var sdata = loc_data;    
+    render_volcano_helper(sdata, xs, ys, change_mode=0);
+  }
+
+  async function change_volcano(xs, ys) {
+    console.log("in change_volcano; xs:" +xs, "; ys:" +ys);
+    
+    //const sdata = d3.filter(data, d => {return d.x == xs && d.y == ys && d.adjpval < max_pval});
+    // get new location data
+    var sdata;
+    if (cur_xs!=xs || cur_ys!=ys) {
+      cur_xs=xs;
+      cur_ys=ys;
+
+      loading_ui();
+      sdata = await get_loc_data_bin();
+      loaded_ui();
+      
+      console.log("in change_volcano; after sdata set");
+      render_volcano_helper(sdata, xs, ys, change_mode=1);
+    } else {
+      sdata = loc_data;
+      console.log("in change_volcano; no data change");
+      render_volcano_helper(sdata, xs, ys, change_mode=1);
+    }
+	}
+  function render_volcano_helper(sdata, xs, ys, change_mode=0) {
+    // data range
+    let loc_pvals = d3.map(sdata, d=>d.pvalue);
+    let temp = get_color_min_max(loc_pvals, 1); // don't chop off extrema for pvalue
+    let cmin = temp[0],
+        cmax = temp[1];
+    let loc_betas = d3.map(loc_data, d=>d.beta);
+    let temp2 = get_color_min_max(loc_betas, 1); // don't chop off extrema for beta
+    vol_s_min = temp2[0];
+    vol_s_max = temp2[1];
+    
+    let temp3 = get_color_min_max(loc_pvals, 1); // for y-axis
+    let cmin2 = temp3[0],
+        cmax2 = temp3[1];
+
+    // axis
+    vol_x = d3.scaleLinear()
+              .range([ 0, width ])
+              .domain([vol_s_min, vol_s_max])
+    vol_y = d3.scaleLinear()
+              .range([ height, 0 ])
+              .domain([-Math.log10(max_pval), -Math.log10(cmin2)]);
+
+    // Build color scale
+    vol_color = d3.scaleSequential()
+                  .interpolator(d3.interpolateBlues)
+                  //.domain([cmax, Number.MIN_VALUE]);
+                  .domain([-Math.log10(0.05), -Math.log10(cmin)]);
+
+    if (change_mode==1) {
+      volcano_svg.select("g#yaxis")
+                 .call(d3.axisLeft(vol_y));
+      volcano_svg.select("g#xaxis")
+                 .call(d3.axisBottom(vol_x));
+      volcano_svg.append("text")
+                 .attr("text-anchor", "end")
+                 .attr("transform", "rotate(-90)")
+                 .attr("y", -margin.left+10)
+                 .attr("x", -margin.top+85)
+                 .text("log10 adjusted p-value")
+
+      volcano_svg.selectAll("#title")
+                 .text(make_volcano_msg(xs, ys));
+      
+      // redraw
+      volcano_svg.selectAll("circle")
+                 .data(sdata)
+                 .join()
+                  .attr("metabolite", d=> d.metabolite)
+                  .attr("cx", function (d) { return vol_x(d.beta); } )
+                  .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
+                  .attr("r", 5)
+                 .style("fill", d=> vol_color(-Math.log10(d.pvalue)));
+    } else {
+      volcano_svg.append("text")
+              .attr("text-anchor", "end")
+              .attr("x", width+10)
+              .attr("y", height + 25)
+              .text("Beta");
+      volcano_svg.append("text")
+                .attr("text-anchor", "end")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -margin.left+10)
+                .attr("x", -margin.top+85)
+                .text("-log10 adjusted p-value")
+      // Add title to graph
+      volcano_svg.append("text")
+        .attr("id", "title")
+        .attr("x", 0)
+        .attr("y", -50)
+        .attr("text-anchor", "left")
+        .attr("class", "h5")
+        .text(make_volcano_msg(xs, ys));
+
+      // Add axis
+      volcano_svg.append("g")
+                .attr("id", "xaxis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(d3.axisBottom(vol_x));
+      volcano_svg.append("g")
+                .attr("id", "yaxis")
+                .call(d3.axisLeft(vol_y));
+
+      var vol_mousemove = async function(e, d) {
+        console.log("in vol_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+        highlight_metabolite(bar_svg, "bar", d.metabolite);
+        highlight_metabolite(volcano_svg, "volcano", d.metabolite);
+
+        freeze_vol = false;
+        if (! freeze_mac) { 
+          await change_macula(d.metabolite, "beta"); // can await before 2nd change_macula to save a file load - but forces things sync
+          change_macula(d.metabolite, "pvalue"); 
+        }
+      }
+      var vol_mouseclick = function(e, d) {
+        console.log("in vol_mouseclick: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+
+        freeze_vol = false;
+        if (freeze_mac) { 
+          freeze_mac = false; 
+        } else { 
+          freeze_mac = true; 
+        }
+        heatmap_svgs["beta"].selectAll("#title")
+                              .text(make_macula_msg(d.metabolite, "beta"));
+        heatmap_svgs["pvalue"].selectAll("#title")
+                              .text(make_macula_msg(d.metabolite, "pvalue"));
+      }      
+      var vol_tooltip = function(e, d) {
+        // remove old tooltips
+        d3.select("#div_tooltip").selectAll(".tooltip").remove();
+
+        d3.select("#div_tooltip")
+           .append("div")
+           .attr("class", "tooltip")
+           .style("visibility", "visible")
+           .style("opacity", 1)
+           .style("left", (e.pageX +10) +"px")
+           .style("top", (e.pageY +10) +"px")
+           .style("color", "lime")
+           .html(info_dict[d.metabolite]["bmarker"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+      }
+
+      volcano_svg.append('g')
+                  .selectAll("dot")
+                  .data(sdata)
+                  .enter()
+                  .append("circle")
+                    .attr("metabolite", d=> d.metabolite)
+                    .attr("cx", function (d) { return vol_x(d.beta); } )
+                    .attr("cy", function (d) { return vol_y(-Math.log10(d.pvalue)); } )
+                    .attr("r", 5)
+                    .style("fill", d=> vol_color(-Math.log10(d.pvalue)))
+                .on("mouseover", vol_tooltip)
+                .on("mousedown", vol_mousemove);
+    }
+  }
+
+  async function render_bar(xs, ys) {
+    console.log("in render_bar; xs:" +xs, "; ys:" +ys);
+
+    // append the svg object to the body of the page
+    bar_svg = d3.select("#horizontal_bar")
+                .append("svg")
+                .attr("width", bar_width +margin.left +margin.right)
+                .attr("height", height +margin.top +margin.bottom)
+                .append("g")
+                .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    render_bar_helper(xs, ys, loc_data, change_mode=0);
+  }
+  async function change_bar(xs, ys) {
+    console.log("in change_bar; xs:" +xs, "; ys:" +ys);
+
+    var sdata;
+    if (cur_xs==xs && cur_ys==ys) {
+      sdata = loc_data;      
+      console.log("in change_bar; no data change");
+      render_bar_helper(xs, ys, sdata, change_mode=1);
+    } else {
+      cur_xs = xs;
+      cur_ys = ys;
+
+      loading_ui();
+      sdata = await get_loc_data_bin();
+      loaded_ui();
+
+      console.log("in change_bar; after sdata set");
+      render_bar_helper(xs, ys, sdata, change_mode=1);
+    }    
+	}
+  function render_bar_helper(xs, ys, sdata, change_mode=0) {
+    // filter data for significant metabolites and sorted
+    let fieldName = "beta";
+    // let data_filtered = d3.filter(sdata, d => {return d.pvalue < bar_thresh} );
+    let data_filtered = sdata;
+    let data_filtered_sorted = data_filtered.sort((a, b) => a[fieldName] - b[fieldName] );
+
+    // Add Y axis - same as volcano X axis
+    bar_y = d3.scaleLinear()
+              .range([ 0, height])
+              .domain([vol_s_max, vol_s_min]);
+
+    // X axis
+    bar_x = d3.scaleBand()
+              .range([ 0, bar_width])
+              .domain(data_filtered_sorted.map(function(d) { return d.metabolite; }));
+
+    // Build color scale
+    let field_vals = d3.map(sdata, d=>d[fieldName]);
+    //let temp = fieldName=="pvalue" ? get_color_min_max(field_vals):get_color_min_max(field_vals,1); // chop off extrema for pvalue
+    let temp = get_color_min_max(field_vals,1); // don't chop off extrema for pvalue
+    let cmin = temp[0],
+        cmax = temp[1];
+    var mac_color = make_mac_color(fieldName, cmin, cmax);
+
+    if (change_mode==1) {
+      // change title
+      bar_svg.selectAll("#title")
+             .text(make_bar_msg(xs, ys));
+
+      bar_svg.select("g#yaxis")
+                 .call(d3.axisLeft(bar_y));
+      bar_svg.select("g#xaxis")
+              .attr("transform", "translate(0," + height + ")")
+              .call(d3.axisBottom(bar_x))
+              .selectAll("text")  
+                .style("text-anchor", "end")
+                .attr("dx", "-.8em")
+                .attr("dy", ".15em")
+                .attr("transform", "rotate(-65)" )
+      
+      // remove everything and then add - something weird about d3.join() for bar charts!?
+      bar_svg.selectAll("rect").remove()
+      bar_svg.selectAll("myRect")
+              .data(data_filtered_sorted)
+              .enter()
+              .append("rect")
+              .attr("metabolite", d=> d.metabolite)
+              .attr("x", function(d) { return bar_x(d.metabolite); })
+              .attr("width", bar_x.bandwidth() )
+              .attr("y", function(d) { 
+                if (d[fieldName]>0) {
+                  return bar_y(d[fieldName]); 
+                } else {
+                  return bar_y(0);
+                }
+              })
+              .attr("height", function(d) { 
+                if (d[fieldName]>0) { 
+                  return -(bar_y(d[fieldName]) - bar_y(0)); 
+                } else {
+                  return (bar_y(d[fieldName]) - bar_y(0)); 
+                }
+              })
+              .style("fill", function(d) { return mac_color(d[fieldName])} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
+              .on("mousemove", bar_tooltip)
+              .on("mousedown", bar_mousemove)
+    } else {    
+      // Add title to graph
+      bar_svg.append("text")
+            .attr("id", "title")
+            .attr("x", 0)
+            .attr("y", -50)
+            .attr("text-anchor", "left")
+            .attr("class", "h5")
+            .text(make_bar_msg(xs, ys));
+      // swap axis
+      bar_svg.append("text")
+              .attr("text-anchor", "end")
+              .attr("x", -22.5)
+              .attr("y", height/2)
+              .text("Effect Size")
+              .attr("transform", "rotate(-90,-22.5," +height/2 +")");
+
+      bar_svg.append("g")
+            .attr("id", "yaxis")
+            .classed('y-axis', true)
+            .call(d3.axisLeft(bar_y))
+            .selectAll("text")
+            .style("text-anchor", "end");
+    
+      bar_svg.append("g")
+            .attr("id", "xaxis")
+            .classed('x-axis', true)
+            .attr("transform", "translate(0," + height + ")")
+            .call(d3.axisBottom(bar_x))
+            .selectAll("text")  
+              .style("text-anchor", "end")
+              .attr("dx", "-.8em")
+              .attr("dy", ".15em")
+              .attr("transform", "rotate(-65)" )
+
+      // event handlers
+      bar_mousemove = async function(e, d) {
+        console.log("in bar_mousemove: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+        highlight_metabolite(bar_svg, "bar", d.metabolite);
+        highlight_metabolite(volcano_svg, "volcano", d.metabolite);
+
+        freeze_vol = false;
+        if (! freeze_mac) {
+          await change_macula(d.metabolite, "beta");  // can await before 2nd change_macula to save a file load - but forces things sync
+          change_macula(d.metabolite, "pvalue"); 
+        }
+      }
+      bar_mouseclick = function(e, d) {
+        console.log("in bar_mouseclick: ", d, "; freeze_mac:" +freeze_mac, "; freeze_vol:" +freeze_vol);
+
+        freeze_vol = false;
+        if (freeze_mac) { 
+          freeze_mac = false; 
+        } else { 
+          freeze_mac = true; 
+        }
+        heatmap_svgs["beta"].selectAll("#title")
+                              .text(make_macula_msg(d.metabolite, "beta"));
+        heatmap_svgs["pvalue"].selectAll("#title")
+                              .text(make_macula_msg(d.metabolite, "pvalue"));
+      }    
+      bar_tooltip = function(e, d) {
+        // remove old tooltips
+        d3.select("#div_tooltip").selectAll(".tooltip").remove();
+
+        d3.select("#div_tooltip")
+           .append("div")
+           .attr("class", "tooltip")
+           .style("visibility", "visible")
+           .style("opacity", 1)
+           .style("left", (e.pageX +10) +"px")
+           .style("top", (e.pageY +10) +"px")
+           .style("color", "lime")
+           .html(info_dict[d.metabolite]["bmarker"] +":<br> beta="+d3.format(".2f")(d.beta) +"; pvalue="+d3.format(".0e")(d.pvalue) )
+      }
+
+      bar_svg.selectAll("myRect")
+              .data(data_filtered_sorted)
+              .enter()
+              .append("rect")
+              .attr("metabolite", d=> d.metabolite)
+              .attr("x", function(d) { return bar_x(d.metabolite); })
+              .attr("width", bar_x.bandwidth() )
+              .attr("y", function(d) { 
+                if (d[fieldName]>0) {
+                  return bar_y(d[fieldName]); 
+                } else {
+                  return bar_y(0);
+                }
+              })
+              .attr("height", function(d) { 
+                if (d[fieldName]>0) { 
+                  return -(bar_y(d[fieldName]) - bar_y(0)); 
+                } else {
+                  return (bar_y(d[fieldName]) - bar_y(0)); 
+                }
+              })
+              .style("fill", function(d) { return mac_color(d[fieldName])} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
+              .on("mouseover", bar_tooltip)
+              .on("mousedown", bar_mousemove)
+    }
+  }
+
+  function make_macula_msg(met, fieldName) {
+    let display_text;
+    let msg;
+    switch(fieldName) {
+      case "beta":
+        display_text = "Effect Size heatmap: ";
+        msg = display_text +info_dict[met]["bmarker"];
+        break;
+      case "pvalue":
+        //msg = "Adjusted p-value Heatmap of " +met +" on Macula";
+        msg = "Adjusted P-value Heatmap: " +info_dict[met]["bmarker"];
+        break;
+      case "meanThick":
+        display_text = "Mean Retinal Thickness";
+        msg = display_text +" Heatmap";
+        break;
+    }
+    if (freeze_mac) {
+      msg += " (Locked - click a Metabolite to unlock)";
+    }
+    return msg;
+  }
+  function make_volcano_msg(xs, ys) {
+    let msg = "Volcano plot for grid location: " +xs +", " +ys;
+    if (freeze_vol) {
+      msg += " (Locked - click a heatmap to unlock)";
+    }
+    return msg;
+  }
+  function make_bar_msg(xs, ys) {
+    let msg = "Bar plot of infections for grid location: " +xs +", " +ys;
+    if (freeze_vol) {
+      msg += " (Locked - click a heatmap to unlock)";
+    }
+    return msg;
+  }
+
+render();
+
+// filter function
+function loadBiomarker(ele) {
+  if (event.key=="Enter") {
+    let filter = ele.value.toLowerCase();
+    let matching_biomarkers = d3.filter(info_array, d => { return d.bmarker.toLowerCase()==filter || d["col.name"].toLowerCase()==filter });
+
+    if (matching_biomarkers.length >0) {
+      on_biomarker_click(matching_biomarkers[0].bmarker);
+    } 
+  } else {
+    // do nothing
+  }
+}
+function filterBiomarkers() {
+  // Declare variables
+  var input, filter, table, tr, td, i, txtValue, tbody_new, tbody_old;
+  input = document.getElementById("myInput");
+  filter = input.value.toLowerCase();
+  table = document.getElementById("myTable");
+  tbody_old = table.tBodies[0];
+  tbody_new = document.createElement("tbody");
+
+  var filtered_biomarkers = d3.filter(info_array, d => { return d.bmarker.toLowerCase().indexOf(filter) > -1 || d["col.name"].toLowerCase().indexOf(filter) > -1 });
+  var filtered_biomarkers_sorted = filtered_biomarkers.sort((a, b) => -parseInt(a["n_sig_adj.P.Val"]) + parseInt(b["n_sig_adj.P.Val"]) );
+  table.style.display = "";
+  // add biomarker matching search
+  if (filtered_biomarkers_sorted.length==0) {
+    tr = document.createElement("tr");
+    td = document.createElement("td");
+    td.innerHTML = "No matching biomarkers found";
+    let td_colspan = document.createAttribute("colspan");
+    td_colspan.value=3;
+    td.setAttributeNode(td_colspan);
+    tr.appendChild(td);
+    tbody_new.appendChild(td);
+    //table.appendChild(tr);
+    tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
+  } else {
+    for (let i=0; i<Math.min(filtered_biomarkers_sorted.length, 50); i++) {
+      tr = document.createElement("tr");
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers_sorted[i].bmarker;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers_sorted[i]["col.name"];
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = d3.format(".2%")(filtered_biomarkers_sorted[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);
+      tr.appendChild(td);
+      
+      let tr_event = document.createAttribute("onclick");
+      tr_event.value = "on_biomarker_click('" +filtered_biomarkers_sorted[i].bmarker +"')";
+      tr.setAttributeNode(tr_event);
+      tbody_new.appendChild(tr);
+    }    
+    tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
+  }
+}
+
+function get_color_min_max(field_vals, min_max=0) {
+  let cmin;
+  let cmax;
+  if (min_max==1) {
+    cmin = d3.min(field_vals);
+    cmax = d3.max(field_vals);
+    console.log("min_max=1; cmin=" +cmin +"; cmax=" +cmax);
+  } else {
+    cmin = d3.quantile(field_vals, 0.05);
+    cmax = d3.quantile(field_vals, 0.95);
+    console.log("min_max=0; cmin=" +cmin +"; cmax=" +cmax);
+  }
+  return [cmin, cmax];
+}
+async function on_biomarker_click(biomarker) {
+  console.log(biomarker);
+  // UI
+  var input = document.getElementById("myInput");
+  input.value = biomarker;
+  var table = document.getElementById("myTable");
+  table.style.display = "none"; // hide table
+  
+  // repaint heatmaps
+  await change_macula(biomarker, "beta");
+  change_macula(biomarker, "pvalue");
+}
+</script>
+
+</body>
+</html>

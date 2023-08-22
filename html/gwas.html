@@ -3,6 +3,16 @@
 <head>
   <meta charset="utf-8">
 
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8ENNDX81GB"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-8ENNDX81GB');
+</script>
+
   <link href="sources/bootstrap.min.css" rel="stylesheet" />
   <script src="sources/bootstrap.bundle.min.js"></script>
   <script src="sources/d3.min.js"></script>
@@ -51,16 +61,16 @@
         <a class="nav-link" href="./metabolomics.html">Metabolomics</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="./icd10.html">ICD10</a>
+        <a class="nav-link" href="./icd10.html">ICD10</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="./hematology.html">Hematology</a>
+        <a class="nav-link" href="./hematology.html">Hematology</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="./infections.html">Infections</a>
+        <a class="nav-link" href="./infections.html">Infections</a>
       </li>
       <li class="nav-item">
-        <a class="nav-link disabled" href="./prs.html">PRS</a>
+        <a class="nav-link" href="./prs.html">PRS</a>
       </li>
     </ul>
   </div>
@@ -149,8 +159,6 @@
 </div>
 
 <script>
-var updateStatus = false;
-
 var COLOR_LIME = "rgb(50, 205, 50)";
 var max_size = Math.min(window.innerWidth, window.innerHeight)/2;
 var margin = {top: 75, right: 70, bottom: 30, left:35},
@@ -219,20 +227,12 @@ var freeze_manhattan = false;
 var freeze_mac = false;
  
   function loading_ui() {
-    if (!updateStatus) {  // first load
-      document.getElementById("loadingData").style.display = "inherit";
-    } else {
-      document.getElementById("loadingData").style.display = "inherit";
-      document.getElementById("bodyContainer").classList.add("bg-secondary");
-    }
+    document.getElementById("loadingData").style.display = "inherit";
+    document.getElementById("bodyContainer").classList.add("bg-secondary");
   }
   function loaded_ui() {
-    if (!updateStatus) {
-      document.getElementById("loadingData").style.display = "none";
-    } else {
-      document.getElementById("loadingData").style.display = "none";
-      document.getElementById("bodyContainer").classList.remove("bg-secondary");
-    }
+    document.getElementById("loadingData").style.display = "none";
+    document.getElementById("bodyContainer").classList.remove("bg-secondary");
   }
 
   function init_svg() {
