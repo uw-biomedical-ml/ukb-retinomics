@@ -72,6 +72,9 @@
         <li class="nav-item">
           <a class="nav-link" href="./prs.html">PRS</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./Comorbidity.html">Comorbidity</a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -96,8 +99,10 @@
       <thead>
         <tr class="header thead-dark">
           <th style="width:15%;">Biomarker</th>
-          <th style="width:60%;">Desc</th>
-          <th style="width:25%;">% Significant Macula Points</th>
+          <th style="width:50%;">Desc</th>
+          <th style="width:10%;">Cell Type</th>
+          <th style="width:10%;">Source</th>
+          <th style="width:15%;">% Significant Macula Points</th>
         </tr>
       </thead>
       <tbody>
@@ -105,6 +110,7 @@
     </table>
   </div>
 
+  <h4>Biomarker View</h4>
   <div class="row">
     <div class="col-4">
       <div class="row" style="--bs-gutter-x:0">
@@ -128,6 +134,8 @@
       </div>
     </div>
   </div>  
+  <hr>
+  <h4>Grid Location View</h4>
   <div class="row">
     <div class="col-4">
       <div id="volcano"></div>
@@ -262,7 +270,7 @@ var bar_thresh = 0.05;
     info_array = await d3.csv(fpath, function(d) {
       //console.log("get_info_data; in d3.csv");
 
-      let curDict = { "bmarker":d.Biomarker, "Cell.Type":d["Cell.Type"], "Standard.Abbreviation":d["Standard.Abbreviation"], "Unit":d.Unit, "Description_long":d.Description_long, "parallel_group":d.parallel_group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC, "p":d.p, "sds":d.sds };
+      let curDict = { "bmarker":d.Biomarker, "cellType":d["Cell.Type"], "abbreviation":d["Standard.Abbreviation"], "Unit":d.Unit, "Description_long":d.Description_long, "source":d["Measured...Derived"], "parallel_group":d.parallel_group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC, "p":d.p, "sds":d.sds };
       info_dict[d.Biomarker] = curDict;
       return curDict;
     });
@@ -635,7 +643,7 @@ var bar_thresh = 0.05;
           .data(sdata)
           .join()
           .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
-          .style("fill-opacity", function(d) { return 1- d.pvalue} )
+          //.style("opacity", function(d) { return 1- d.pvalue} )
           .style("stroke-width", 0)
           .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
 
@@ -712,7 +720,7 @@ var bar_thresh = 0.05;
         .attr("width", mac_xfunc.bandwidth() )
         .attr("height", mac_yfunc.bandwidth() )
         .style("fill", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
-        .style("opacity", function(d) { return 1- d.pvalue} )
+        //.style("opacity", function(d) { return 1- d.pvalue} )
         .style("stroke-width", 0)
         .style("stroke", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
         .on("mousedown", mousemove);
@@ -988,7 +996,7 @@ var bar_thresh = 0.05;
                 }
               })
               .style("fill", function(d) { return mac_color(d[fieldName])} )
-              .style("opacity", function(d) { return 1- d.pvalue} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
               .on("mousemove", bar_tooltip)
               .on("mousedown", bar_mousemove)
     } else {    
@@ -1089,7 +1097,7 @@ var bar_thresh = 0.05;
                 }
               })
               .style("fill", function(d) { return mac_color(d[fieldName])} )
-              .style("opacity", function(d) { return 1- d.pvalue} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
               .on("mouseover", bar_tooltip)
               .on("mousedown", bar_mousemove)
     }
@@ -1165,7 +1173,7 @@ function filterBiomarkers() {
     td = document.createElement("td");
     td.innerHTML = "No matching biomarkers found";
     let td_colspan = document.createAttribute("colspan");
-    td_colspan.value=3;
+    td_colspan.value=5;
     td.setAttributeNode(td_colspan);
     tr.appendChild(td);
     tbody_new.appendChild(td);
@@ -1179,6 +1187,12 @@ function filterBiomarkers() {
       tr.appendChild(td);
       td = document.createElement("td");
       td.innerHTML = filtered_biomarkers_sorted[i].Description_long;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers_sorted[i].cellType;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers_sorted[i].source;
       tr.appendChild(td);
       td = document.createElement("td");
       td.innerHTML = d3.format(".2%")(filtered_biomarkers_sorted[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);

@@ -72,6 +72,9 @@
         <li class="nav-item">
           <a class="nav-link" href="./prs.html">PRS</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./Comorbidity.html">Comorbidity</a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -105,6 +108,7 @@
     </table>
   </div>
 
+  <h4>ICD10 View</h4>
   <div class="row">
     <div class="col-4">
       <div class="row" style="--bs-gutter-x:0">
@@ -127,7 +131,9 @@
         <div id="heatmap_meanThick" class="col-11"></div>
       </div>
     </div>
-  </div>  
+  </div>
+  <hr>
+  <h4>Grid Location View</h4>
   <div class="row">
     <div class="col-4">
       <div id="volcano"></div>
@@ -635,7 +641,7 @@ var bar_thresh = 0.05;
           .data(sdata)
           .join()
           .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
-          .style("fill-opacity", function(d) { return 1- d.pvalue} )
+          //.style("opacity", function(d) { return 1- d.pvalue} )
           .style("stroke-width", 0)
           .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
 
@@ -712,7 +718,7 @@ var bar_thresh = 0.05;
         .attr("width", mac_xfunc.bandwidth() )
         .attr("height", mac_yfunc.bandwidth() )
         .style("fill", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
-        .style("opacity", function(d) { return 1- d.pvalue} )
+        //.style("opacity", function(d) { return 1- d.pvalue} )
         .style("stroke-width", 0)
         .style("stroke", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
         .on("mousedown", mousemove);
@@ -984,7 +990,7 @@ var bar_thresh = 0.05;
                 }
               })
               .style("fill", function(d) { return mac_color(d[fieldName])} )
-              .style("opacity", function(d) { return 1- d.pvalue} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
               .on("mousemove", bar_tooltip)
               .on("mousedown", bar_mousemove)
     } else {    
@@ -1085,7 +1091,7 @@ var bar_thresh = 0.05;
                 }
               })
               .style("fill", function(d) { return mac_color(d[fieldName])} )
-              .style("opacity", function(d) { return 1- d.pvalue} )
+              //.style("opacity", function(d) { return 1- d.pvalue} )
               .on("mouseover", bar_tooltip)
               .on("mousedown", bar_mousemove)
     }

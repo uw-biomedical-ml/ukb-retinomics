@@ -72,6 +72,9 @@
       <li class="nav-item">
         <a class="nav-link" href="./prs.html">PRS</a>
       </li>
+      <li class="nav-item">
+        <a class="nav-link" href="./Comorbidity.html">Comorbidity</a>
+      </li>
     </ul>
   </div>
 </nav>
@@ -111,6 +114,7 @@
     </table>
   </div>
 
+  <h4>SNP View</h4>
   <div class="row">
     <div class="col-4">
       <div class="row" style="--bs-gutter-x:0">
@@ -134,8 +138,9 @@
       </div>
     </div>
   </div>
+  <hr>
+  <h4>Grid Location View</h4>
   <div class="row">
-
     <div class="col-6">
       <div id="manhattan_full"></div>
     </div>
@@ -147,6 +152,7 @@
     <div class="col-2">
       <h5>Usage Guide</h5>
       <ul>
+        <li>Red line in Manhattan plots are the Bonferroni corrected p-value thresholds</li>
         <li>Click a heatmap to load Manhattan plots for selected macula location</li>
         <li>Click a SNP in Manhattan plot to load its heatmaps and zoom on SNP</li>
         <li>Search for SNPs directly, select them and see their heatmaps</li>
@@ -746,7 +752,7 @@ var freeze_mac = false;
         .data(sdata)
         .join()
         .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
-        .style("fill-opacity", function(d) { return 1- d.pvalue} )
+        //.style("opacity", function(d) { return 1- d.pvalue} )
         .style("stroke-width", 0)
         .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
     } else {      
@@ -825,7 +831,7 @@ var freeze_mac = false;
         .attr("width", mac_xfunc.bandwidth() )
         .attr("height", mac_yfunc.bandwidth() )
         .style("fill", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
-        .style("opacity", function(d) { return 1- d.pvalue} )
+        //.style("opacity", function(d) { return 1- d.pvalue} )
         .style("stroke-width", 0)
         .style("stroke", d => extract_macula_heatmap_data(d, mac_color, fieldName) )
         //.on("mousemove", mousemove)
@@ -1127,7 +1133,8 @@ var freeze_mac = false;
                       .attr("d",l1)
                       .attr("stroke", "red")
                       .attr("stroke-width", 1)
-                      
+      
+    /*
       // Add bonfLabel to graph
       manhattan_svg.selectAll("#bonfLabel")
                    .join()
@@ -1136,14 +1143,16 @@ var freeze_mac = false;
                       .attr("text-anchor", "left")
                       .attr("class", "h5")
                       .text("Bonferroni");
+    */
     } else {
       manhattan_svg.append("path")
                    .attr("id", "bonfLine")
                    .attr("d",l1)
                    .attr("stroke", "red")
                    .attr("stroke-width", 1)
-                  
-    // Add bonfLabel to graph
+    
+    /*
+      // Add bonfLabel to graph
       manhattan_svg.append("text")
                    .attr("id", "bonfLabel")
                    .attr("x", width-25)
@@ -1151,6 +1160,7 @@ var freeze_mac = false;
                    .attr("text-anchor", "left")
                    .attr("class", "h5")
                    .text("Bonferroni");
+    */
     }
   }
   

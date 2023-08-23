@@ -72,6 +72,9 @@
         <li class="nav-item">
           <a class="nav-link" href="./prs.html">PRS</a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link" href="./Comorbidity.html">Comorbidity</a>
+        </li>
       </ul>
     </div>
   </nav>
@@ -96,8 +99,9 @@
       <thead>
         <tr class="header thead-dark">
           <th style="width:15%;">Infection</th>
-          <th style="width:60%;">Desc</th>
-          <th style="width:25%;">% Significant Macula Points</th>
+          <!--<th style="width:60%;">Desc</th>-->
+          <th style="width:10%;">Type</th>
+          <th style="width:15%;">% Significant Macula Points</th>
         </tr>
       </thead>
       <tbody>
@@ -105,6 +109,7 @@
     </table>
   </div>
 
+  <h4>Infection View</h4>
   <div class="row">
     <div class="col-4">
       <div class="row" style="--bs-gutter-x:0">
@@ -128,6 +133,8 @@
       </div>
     </div>
   </div>  
+  <hr>
+  <h4>Grid Location View</h4>
   <div class="row">
     <div class="col-4">
       <div id="volcano"></div>
@@ -262,7 +269,7 @@ var bar_thresh = 0.05;
     info_array = await d3.csv(fpath, function(d) {
       //console.log("get_info_data; in d3.csv");
 
-      let curDict = { "bmarker":d.Biomarker, "col.name":d["col.name"], "parallel_group":d.parallel_group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC, "p":d.p, "sds":d.sds };
+      let curDict = { "bmarker":d.Biomarker, "col.name":d["col.name"], "path":d.path, "parallel_group":d.parallel_group, "n_sig_FDR":d.n_sig_FDR, "n_sig_adj.P.Val": d["n_sig_adj.P.Val"], "n_sig_bonf":d.n_sig_bonf, "SigLogFC":d.SigLogFC, "LogFC":d.LogFC, "p":d.p, "sds":d.sds };
       info_dict[d.Biomarker] = curDict;
       return curDict;
     });
@@ -636,7 +643,7 @@ var bar_thresh = 0.05;
           .data(sdata)
           .join()
           .style("fill", d=> extract_macula_heatmap_data(d, mac_color, fieldName))
-          //.style("fill-opacity", function(d) { return 1- d.pvalue} )
+          //.style("opacity", function(d) { return 1- d.pvalue} )
           .style("stroke-width", 0)
           .style("stroke", function(d) { return extract_macula_heatmap_data(d, mac_color, fieldName) })
 
@@ -1179,8 +1186,13 @@ function filterBiomarkers() {
       td = document.createElement("td");
       td.innerHTML = filtered_biomarkers_sorted[i].bmarker;
       tr.appendChild(td);
+      /*
       td = document.createElement("td");
       td.innerHTML = filtered_biomarkers_sorted[i]["col.name"];
+      tr.appendChild(td);
+      */
+      td = document.createElement("td");
+      td.innerHTML = filtered_biomarkers_sorted[i]["path"];
       tr.appendChild(td);
       td = document.createElement("td");
       td.innerHTML = d3.format(".2%")(filtered_biomarkers_sorted[i]["n_sig_adj.P.Val"]/NUM_GRID_POINTS);
