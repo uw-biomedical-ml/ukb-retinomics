@@ -100,13 +100,18 @@
       -->
     </div>
 
-    <table id="myTable" class="table table-striped table-overflow" style="display:none";>
+    <table id="myTable" class="table table-striped table-overflow text-center" style="display:none";>
       <thead>
         <tr class="header">
-          <th style="width:20%;">SNP</th>
-          <th style="width:10%;">Chromosome</th>
-          <th style="width:30%;">% of Macula area</th>
-          <th style="width:40%;">Within a significant locus</th>
+          <th class="col-2">SNP</th>
+          <th class="col-1">Chr</th>
+          <th class="col-2">Position</th>
+          <th class="col-1">EffAllele</th>
+          <th class="col-1">non-EffAllele</th>
+          <th class="col-2">EffAlleleFreq</th>
+          <th class="col-2">Gene</th>
+          <th class="col-1">% of Macula area</th>
+          <th class="col-1">Within a significant locus</th>
         </tr>
       </thead>
       <tbody>
@@ -155,11 +160,18 @@
         <li>Red line in Manhattan plots are the Bonferroni corrected p-value thresholds</li>
         <li>Click a heatmap to load Manhattan plots for selected macula location</li>
         <li>Click a SNP in Manhattan plot to load its heatmaps and zoom on SNP</li>
-        <li>Search for SNPs directly, select them and see their heatmaps</li>
+        <li>Search for SNPs directly or by gene, select them and see their heatmaps</li>
         <li>Search by SNP position range, e.g. chr3:1-1000000 displays the first million bases of chromosome 3, counting from the p-arm telomere</li>
+        <li>The dynamic Manhattan plots show the sentinel and 130,000+ related SNPs.</li>
+        <li>The full Manhattan plot of 11 million SNPs is shown at the bottom.</li>
       </ul>
     </div>
     
+  </div>
+  <div class="row">
+    <div class="col-12">
+      <img id="manhattan_full_static" src="" alt="Full Manhattan for grid location" width="100%">
+    </div>
   </div>
   <div id="div_tooltip"></div>
 </div>
@@ -295,7 +307,16 @@ var freeze_mac = false;
     myPromises.push(SNP_promise);
 
     await get_info_data_bin();                    // needed for position info for manhattan along with loc_data
-    let info_all_promise = get_info_data_all_bin();        // async (all SNPs)
+    
+    let infoPromises = [];
+    let info_all_promise;
+    let chromosomes = Object.keys(CHR_NUM_SLIPS_DICT);
+    for (let i=0; i<chromosomes.length ; i++ ) {  // async (all SNPs)
+      let cur_chrom = chromosomes[i];
+      let fpath = "data/gwas/SNP_info_summary/info_SNPs_chr" +cur_chrom +".csv.gz";
+      info_all_promise = get_info_data_all_bin(fpath);
+      infoPromises.push(info_all_promise)
+    }
     // myPromises.push(info_all_promise);       // not needed immediately and LARGE!
 
     let loc_promise = get_loc_data_bin();       // using compressed files
@@ -304,7 +325,7 @@ var freeze_mac = false;
     return myPromises;
   }
   async function get_info_data_bin() {
-    let fpath = "data/gwas/info_sigSNPs.csv.gz";
+    let fpath = "data/gwas/SNP_info_summary/info_sigSNPs.csv.gz";
 
     let myPromise = new Promise(function(resolve) {
       const req = new XMLHttpRequest();
@@ -327,8 +348,8 @@ var freeze_mac = false;
           console.log("get_info_data_bin; after decode: " +data_str.length);
 
           SNP_info_data = d3.csvParse(data_str, function(d) {
-            SNP_info_dict[d.SNP] = {"pos":parseInt(d.pos), "A1":d.A1, "chr":d.chr, "sentinel":parseInt(d.sentinel)};
-            return { "SNP": d.SNP, "chr":d.chr, "A1":d.A1, "pos":parseInt(d.pos), "num_sig":parseInt(d.num_sig), "bonf":d.bonf!="N"};
+            SNP_info_dict[d.SNP] = {"pos":parseInt(d.pos), "chr":d.chr, "sentinel":parseInt(d.sentinel)};
+            return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "num_sig":parseInt(d.num_sig), "bonf":d.bonf!="N", "EA":d.effAllele, "nEA":d.noneffAllele, "eAF":d.effAlleleFreq, "g":d.Gene};
           });
           /*
           manhattan_x_vals = d3.map(SNP_info_data, function(d){return create_composite_chr_pos(d); });  // map field values once!
@@ -347,10 +368,10 @@ var freeze_mac = false;
     });
     return myPromise;
   }  
-  async function get_info_data_all_bin() {
+  async function get_info_data_all_bin(fpath=None) {
     //let fpath = "data/gwas/info_SNPs.csv.gz";
-    let fpath = "data/gwas/info_SNPs_v2.csv.gz";
-
+    fpath = fpath==null ? "data/gwas/info_SNPs_v2.csv.gz" : fpath;
+    
     let myPromise = new Promise(function(resolve) {
       const req = new XMLHttpRequest();
       let asyncFlag = true;
@@ -372,8 +393,8 @@ var freeze_mac = false;
           console.log("get_info_data_all_bin; after decode: " +data_str.length);
 
           let SNP_info_data_all = d3.csvParse(data_str, function(d) {
-            // return { "SNP": d.SNP, "chr":d.chr, "num_sig":0, "bonf":0};
-            return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "num_sig":0, "bonf":0};
+            // return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "num_sig":0, "bonf":0};
+            return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "EA":d.effAllele, "nEA":d.noneffAllele, "eAF":d.effAlleleFreq, "g":d.Gene};
           });
 
           SNP_info_data = SNP_info_data.concat(SNP_info_data_all);
@@ -521,6 +542,7 @@ var freeze_mac = false;
       render_manhattan(cur_xs, cur_ys);
       render_manhattan(cur_xs, cur_ys, cur_SNP);
       
+      change_manhattan_static(cur_xs, cur_ys);
       loaded_ui();
       console.log("after data load");
     })
@@ -804,6 +826,7 @@ var freeze_mac = false;
           highlight_coord(heatmap_svgs["meanThick"], d.x, d.y);
           // update to show on macula heatmaps
           change_manhattan(d.x, d.y);  // can trigger zoomed version!
+          change_manhattan_static(d.x, d.y);  // load new full static manhattan image
         }
       }
       var mouseclick = function(e, d) {
@@ -1251,7 +1274,7 @@ function filterSNPs() {
   var filtered_SNPs;
   let chr_pattern  = /chr[0-9xy]+:/;
   let result = filter.match(chr_pattern);
-  if (result!=null) {
+  if (result!=null) { // by chromosome position
     let chr_str = result[0].replace("chr", "").replace(":", "");
     let rem_filter = filter.replace(result[0], "");
     let pos_pattern  = /[0-9]+/g;
@@ -1264,8 +1287,8 @@ function filterSNPs() {
           end_pos = parseInt(pos_results[1]);
       filtered_SNPs = d3.filter(SNP_info_data, d => { return (d.chr==chr_str.toUpperCase()) && (d.pos > init_pos) && (d.pos <= end_pos) });
     }
-  } else {
-    filtered_SNPs = d3.filter(SNP_info_data, d => { return d.SNP.toLowerCase().indexOf(filter) > -1 });
+  } else { // by SNP or gene
+    filtered_SNPs = d3.filter(SNP_info_data, d => { return d.SNP.toLowerCase().indexOf(filter) > -1 || d.g.toLowerCase().indexOf(filter) > -1 });
   }
   table.style.display = "";
   // add SNPs matching search
@@ -1274,7 +1297,7 @@ function filterSNPs() {
     td = document.createElement("td");
     td.innerHTML = filter_msg;
     let td_colspan = document.createAttribute("colspan");
-    td_colspan.value=3;
+    td_colspan.value=8;
     td.setAttributeNode(td_colspan);
     tr.appendChild(td);
     tbody_new.appendChild(td);
@@ -1282,6 +1305,7 @@ function filterSNPs() {
     tbody_old.parentNode.replaceChild(tbody_new, tbody_old);
   } else {
     for (let i=0; i<Math.min(filtered_SNPs.length, 50); i++) {
+      // base info
       tr = document.createElement("tr");
       td = document.createElement("td");
       td.innerHTML = filtered_SNPs[i].SNP;
@@ -1290,13 +1314,33 @@ function filterSNPs() {
       td.innerHTML = filtered_SNPs[i].chr;
       tr.appendChild(td);
       td = document.createElement("td");
-      td.innerHTML = d3.format(".2%")(filtered_SNPs[i].num_sig/NUM_GRID_POINTS);
-      tr.appendChild(td);
-      td = document.createElement("td");
-      td.innerHTML = filtered_SNPs[i].num_sig > 0 ? "Yes":"Not available as not significant";
+      td.innerHTML = filtered_SNPs[i].pos;
       tr.appendChild(td);
       
-      if (filtered_SNPs[i].num_sig > 0) {
+      // new gene info
+      td = document.createElement("td");
+      td.innerHTML = filtered_SNPs[i].EA;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_SNPs[i].nEA;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_SNPs[i].eAF;
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML = filtered_SNPs[i].g!="" ? filtered_SNPs[i].g:"intergenic";
+      tr.appendChild(td);
+
+      // gwas info
+      let num_sig = "num_sig" in filtered_SNPs[i] ? filtered_SNPs[i].num_sig:0;
+      td = document.createElement("td");
+      td.innerHTML = d3.format(".2%")(num_sig/NUM_GRID_POINTS);
+      tr.appendChild(td);
+      td = document.createElement("td");
+      td.innerHTML =  num_sig > 0 ? "Yes":"Not available as not significant";
+      tr.appendChild(td);
+      
+      if (num_sig > 0) {
         let tr_event = document.createAttribute("onclick");
         tr_event.value = "on_SNP_click('" +filtered_SNPs[i].SNP +"')";
         tr.setAttributeNode(tr_event);
@@ -1331,6 +1375,10 @@ async function on_SNP_click(SNP) {
   // repaint heatmaps
   await change_macula(SNP, "beta");
   change_macula(SNP, "pvalue");
+}
+function change_manhattan_static(xs, ys) {
+  let cur_grid_img_path = "data/gwas/manhattan_imgs/Pixel" +ys +"_" +xs +"_manhattan_thin.png";
+  document.getElementById("manhattan_full_static").src = cur_grid_img_path;
 }
 </script>
 
