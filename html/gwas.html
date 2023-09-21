@@ -308,6 +308,7 @@ var freeze_mac = false;
 
     await get_info_data_bin();                    // needed for position info for manhattan along with loc_data
     
+    /*
     let infoPromises = [];
     let info_all_promise;
     let chromosomes = Object.keys(CHR_NUM_SLIPS_DICT);
@@ -318,6 +319,7 @@ var freeze_mac = false;
       infoPromises.push(info_all_promise)
     }
     // myPromises.push(info_all_promise);       // not needed immediately and LARGE!
+    */
 
     let loc_promise = get_loc_data_bin();       // using compressed files
     myPromises.push(loc_promise);
@@ -544,6 +546,17 @@ var freeze_mac = false;
       
       change_manhattan_static(cur_xs, cur_ys);
       loaded_ui();
+
+      // load after interactive charts rendered
+      let infoPromises = [];
+      let info_all_promise;
+      let chromosomes = Object.keys(CHR_NUM_SLIPS_DICT);
+      for (let i=0; i<chromosomes.length ; i++ ) {  // async (all SNPs)
+        let cur_chrom = chromosomes[i];
+        let fpath = "data/gwas/SNP_info_summary/info_SNPs_chr" +cur_chrom +".csv.gz";
+        info_all_promise = get_info_data_all_bin(fpath);
+        infoPromises.push(info_all_promise)
+      }
       console.log("after data load");
     })
 
