@@ -84,13 +84,16 @@
 <body>
 <div class="container-fluid" id="bodyContainer" style="background-color:#CCC"> <!-- max-width:1320 from bootstrap -->
   <div class="row" style="width:50%">
-    <button class="btn btn-primary col-2" id="loadingData">
+    <button class="btn btn-primary col-2" id="loadingData_spin" style="display:none">
       <span class="spinner-border spinner-border-sm"></span>
       Loading..
     </button>
     <!--
     <progress id="loadingData" aria-label="Content loading…"></progress>    
     -->
+    <div class="progress col-10" id="loadingData">
+      <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="15" aria-valuemin="0" aria-valuemax="100" style="width: 15%"></div>
+    </div>
     
     <div class="form-group col-10">
        <!--<label for="myInput" class="col-sm-2 col-form-label">Search for SNPs</label> -->
@@ -191,6 +194,8 @@ var heatmap_bar_width =10;
 var manhattan_zoom_width = width;
 var manhattan_full_width = manhattan_zoom_width*2;
 
+var load_counter =0;
+var load_init = 1;
 var thickness_data;
 var SNP_info_data;
 var SNP_info_dict = {};
@@ -248,11 +253,13 @@ var freeze_manhattan = false;
 var freeze_mac = false;
  
   function loading_ui() {
-    document.getElementById("loadingData").style.display = "inherit";
+    let targetID = load_init==1 ? "loadingData":"loadingData_spin";
+    document.getElementById(targetID).style.display = "inherit";
     document.getElementById("bodyContainer").classList.add("bg-secondary");
   }
   function loaded_ui() {
-    document.getElementById("loadingData").style.display = "none";
+    let targetID = load_init==1 ? "loadingData":"loadingData_spin";
+    document.getElementById(targetID).style.display = "none";
     document.getElementById("bodyContainer").classList.remove("bg-secondary");
   }
 
@@ -309,7 +316,7 @@ var freeze_mac = false;
     let SNP_promise = get_SNP_data_bin();       // using compressed files
     myPromises.push(SNP_promise);
 
-    await get_info_data_bin();                    // needed for position info for manhattan along with loc_data
+    info_promise = get_info_data_bin();                    // needed for position info for manhattan along with loc_data   
     
     /*
     let infoPromises = [];
@@ -362,6 +369,8 @@ var freeze_mac = false;
                                .range([ 0, manhattan_full_width ])
                                .domain(d3.union(manhattan_x_vals));
           */
+          load_counter +=1;
+          set_progress_bar();
           resolve(SNP_info_data);
         } else {
           console.log("File not found: " + fpath);
@@ -440,6 +449,8 @@ var freeze_mac = false;
           thickness_data = d3.csvParse(data_str, function(d) {
             return { "y": parseInt(d.slice_num)+1, "x": parseInt(d.coord_num)+1, "meanThick": parseFloat(d.mean_thick)*PIXEL_TO_MICRONS_THICKNESS, "stdThick": parseFloat(d.std_thick)*PIXEL_TO_MICRONS_THICKNESS, "medianThick":parseFloat(d.median_thick)*PIXEL_TO_MICRONS_THICKNESS };
           });
+          load_counter +=1;
+          set_progress_bar();
           resolve(thickness_data);
         } else {
           console.log("File not found: " +fpath);
@@ -479,6 +490,8 @@ var freeze_mac = false;
             return { "SNP": d.SNP, "chr":d.chr, "beta":parseFloat(d.beta), "pvalue":parseFloat(d.pval), "pos":SNP_info_dict[d.SNP]["pos"], "sentinel":SNP_info_dict[d.SNP]["sentinel"]};
             // return { "SNP": d.SNP, "chr":d.chr, "beta":d.beta, "pvalue":d.pval};
           });
+          load_counter +=1;
+          set_progress_bar();
           resolve(loc_data);
         } else { 
           console.log("File not found: " +fpath);
@@ -518,6 +531,8 @@ var freeze_mac = false;
           SNP_data = d3.csvParse(data_str, function(d) {
             return { "SNP": d.snip, "y":parseInt(d.slice_num), "x":parseInt(d.coord_num), "beta":parseFloat(d.beta), "pvalue":parseFloat(d.pval), "bonf":d.is_bonf!="False"};
           });
+          load_counter +=1;
+          set_progress_bar();
           resolve(SNP_data);
         } else { 
           console.log("File not found: " +fpath);
@@ -530,6 +545,12 @@ var freeze_mac = false;
     return myPromise;
   }
 
+  function set_progress_bar() {
+    let curProg = (load_counter+1)/5;
+    document.getElementById("loadingData").children[0].ariaValueNow = curProg*100;
+    document.getElementById("loadingData").children[0].style.width = d3.format(".2%")(curProg);
+    document.getElementById("loadingData").children[0].innerHTML = d3.format(".2%")(curProg);
+  }
   async function render() {
     console.log("in render");
 
@@ -549,6 +570,7 @@ var freeze_mac = false;
       
       change_manhattan_static(cur_xs, cur_ys);
       loaded_ui();
+      load_init = 0;
 
       // load after interactive charts rendered
       let infoPromises = [];
