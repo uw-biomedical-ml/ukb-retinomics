@@ -548,8 +548,8 @@ var freeze_mac = false;
   function set_progress_bar() {
     let curProg = (load_counter+1)/5;
     document.getElementById("loadingData").children[0].ariaValueNow = curProg*100;
-    document.getElementById("loadingData").children[0].style.width = d3.format(".2%")(curProg);
-    document.getElementById("loadingData").children[0].innerHTML = d3.format(".2%")(curProg);
+    document.getElementById("loadingData").children[0].style.width = d3.format(".0%")(curProg);
+    document.getElementById("loadingData").children[0].innerHTML = d3.format(".0%")(curProg);
   }
   async function render() {
     console.log("in render");
