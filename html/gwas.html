@@ -88,6 +88,9 @@
       <span class="spinner-border spinner-border-sm"></span>
       Loading..
     </button>
+    <!--
+    <progress id="loadingData" aria-label="Content loading…"></progress>    
+    -->
     
     <div class="form-group col-10">
        <!--<label for="myInput" class="col-sm-2 col-form-label">Search for SNPs</label> -->
@@ -350,7 +353,7 @@ var freeze_mac = false;
           console.log("get_info_data_bin; after decode: " +data_str.length);
 
           SNP_info_data = d3.csvParse(data_str, function(d) {
-            SNP_info_dict[d.SNP] = {"pos":parseInt(d.pos), "chr":d.chr, "sentinel":parseInt(d.sentinel)};
+            SNP_info_dict[d.SNP] = {"pos":parseInt(d.pos), "chr":d.chr, "sentinel":parseInt(d.sentinel), "EA":d.effAllele};
             return { "SNP": d.SNP, "chr":d.chr, "pos":parseInt(d.pos), "num_sig":parseInt(d.num_sig), "bonf":d.bonf!="N", "EA":d.effAllele, "nEA":d.noneffAllele, "eAF":d.effAlleleFreq, "g":d.Gene};
           });
           /*
@@ -1217,11 +1220,11 @@ var freeze_mac = false;
     switch(fieldName) {
       case "beta":
         display_text = "Effect Size Heatmap: ";
-        msg = display_text +SNP;
+        msg = display_text +SNP +" (effAllele: " +SNP_info_dict[SNP]["EA"] +")";
         break;
       case "pvalue":
         display_text = "P-value Heatmap: ";
-        msg = display_text +SNP;
+        msg = display_text +SNP +" (effAllele: " +SNP_info_dict[SNP]["EA"] +")";
         break;
       case "meanThick":
         display_text = "Mean Retinal Thickness";
