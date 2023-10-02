@@ -316,7 +316,7 @@ var freeze_mac = false;
     let SNP_promise = get_SNP_data_bin();       // using compressed files
     myPromises.push(SNP_promise);
 
-    await info_promise = get_info_data_bin();   // needed for position info for manhattan along with loc_data   
+    await get_info_data_bin();   // needed for position info for manhattan along with loc_data   
     
     /*
     let infoPromises = [];
