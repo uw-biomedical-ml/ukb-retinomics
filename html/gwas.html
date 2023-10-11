@@ -1344,7 +1344,7 @@ function filterSNPs() {
   } else {
     for (let i=0; i<Math.min(filtered_SNPs.length, 50); i++) {
       // base info
-      tr = document.createElement("tr");
+      tr = document.createElement("tr");     
       td = document.createElement("td");
       td.innerHTML = filtered_SNPs[i].SNP;
       tr.appendChild(td);
@@ -1375,7 +1375,11 @@ function filterSNPs() {
       td.innerHTML = d3.format(".2%")(num_sig/NUM_GRID_POINTS);
       tr.appendChild(td);
       td = document.createElement("td");
-      td.innerHTML =  num_sig > 0 ? "Yes":"Not available as not significant";
+      //td.innerHTML =  num_sig > 0 ? "Yes":"Not available as not significant";
+      td.innerHTML =  num_sig > 0 ? "Yes":"NA";
+      if (num_sig ==0) {
+        tr.classList.add("table-secondary");
+      }
       tr.appendChild(td);
       
       if (num_sig > 0) {
@@ -1413,6 +1417,9 @@ async function on_SNP_click(SNP) {
   // repaint heatmaps
   await change_macula(SNP, "beta");
   change_macula(SNP, "pvalue");
+
+  await change_manhattan(xs, ys); 
+  change_manhattan(xs, ys, SNP);  // trigger focused SNP
 }
 function change_manhattan_static(xs, ys) {
   let cur_grid_img_path = "data/gwas/manhattan_imgs/Pixel" +ys +"_" +xs +"_manhattan_thin.png";
