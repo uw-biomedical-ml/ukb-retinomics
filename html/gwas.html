@@ -1418,7 +1418,8 @@ async function on_SNP_click(SNP) {
   await change_macula(SNP, "beta");
   change_macula(SNP, "pvalue");
 
-  change_manhattan(cur_xs, cur_ys); 
+  // await change_manhattan(cur_xs, cur_ys); 
+  highlight_SNP(manhattan_svgs["full"], "full", SNP); // full version not re-rendered so need to highlight separately
   change_manhattan(cur_xs, cur_ys, SNP);  // trigger focused SNP
 }
 function change_manhattan_static(xs, ys) {
