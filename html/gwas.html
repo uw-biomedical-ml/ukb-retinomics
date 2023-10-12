@@ -1418,8 +1418,8 @@ async function on_SNP_click(SNP) {
   await change_macula(SNP, "beta");
   change_macula(SNP, "pvalue");
 
-  await change_manhattan(xs, ys); 
-  change_manhattan(xs, ys, SNP);  // trigger focused SNP
+  await change_manhattan(cur_xs, cur_ys); 
+  change_manhattan(cur_xs, cur_ys, SNP);  // trigger focused SNP
 }
 function change_manhattan_static(xs, ys) {
   let cur_grid_img_path = "data/gwas/manhattan_imgs/Pixel" +ys +"_" +xs +"_manhattan_thin.png";
